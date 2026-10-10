@@ -222,4 +222,73 @@ test('Vendor matches return a calculated probability score out of 100% based on 
   }
 });
 
+test('Chat and messaging between organizer and vendor', async () => {
+  const orgToken = await login('organizer@demo.com');
+  const vendorToken = await login('royalbanquet@demo.com');
+
+  // Find user IDs
+  const orgMe = (await call('GET', '/api/me', orgToken)).data.user;
+  const vendorMe = (await call('GET', '/api/me', vendorToken)).data.user;
+
+  // Initial unread count for vendor should be 0
+  const unreadBefore = (await call('GET', '/api/messages/unread/count', vendorToken)).data.unread;
+
+  // Organizer sends a message to the vendor
+  const sendRes = await call('POST', '/api/messages', orgToken, {
+    receiver_id: vendorMe.id,
+    text: 'Hello Royal Banquet, can you provide a customized vegan menu option?'
+  });
+  assert.equal(sendRes.status, 200);
+  assert.equal(sendRes.data.ok, true);
+  assert.equal(sendRes.data.message.sender_id, orgMe.id);
+  assert.equal(sendRes.data.message.receiver_id, vendorMe.id);
+  assert.equal(sendRes.data.message.text, 'Hello Royal Banquet, can you provide a customized vegan menu option?');
+
+  // Vendor's unread count should increase by 1
+  const unreadAfter = (await call('GET', '/api/messages/unread/count', vendorToken)).data.unread;
+  assert.equal(unreadAfter, unreadBefore + 1);
+
+  // Vendor should have received a notification
+  const vendorNotifs = (await call('GET', '/api/notifications', vendorToken)).data.items;
+  assert.ok(vendorNotifs.some(n => n.message.includes('customized vegan menu')));
+
+  // Vendor checks conversations list
+  const convList = (await call('GET', '/api/conversations', vendorToken)).data.conversations;
+  const orgConv = convList.find(c => c.partner_id === orgMe.id);
+  assert.ok(orgConv, 'Organizer should appear in vendor conversations list');
+  assert.equal(orgConv.unread_count, 1);
+
+  // Vendor reads the messages from the organizer
+  const threadRes = await call('GET', `/api/messages/${orgMe.id}`, vendorToken);
+  assert.equal(threadRes.status, 200);
+  assert.equal(threadRes.data.messages.length, 1);
+  assert.equal(threadRes.data.messages[0].is_read, 1, 'Message must be marked read upon fetch');
+  assert.equal(threadRes.data.partner.id, orgMe.id);
+
+  // Vendor unread count drops back
+  const unreadAfterRead = (await call('GET', '/api/messages/unread/count', vendorToken)).data.unread;
+  assert.equal(unreadAfterRead, unreadBefore);
+
+  // Vendor sends reply
+  const replyRes = await call('POST', '/api/messages', vendorToken, {
+    receiver_id: orgMe.id,
+    text: 'Yes absolutely! We can accommodate any dietary restrictions.'
+  });
+  assert.equal(replyRes.status, 200);
+
+  // Organizer fetches thread and verifies both messages
+  const orgThread = (await call('GET', `/api/messages/${vendorMe.id}`, orgToken)).data;
+  assert.equal(orgThread.messages.length, 2);
+  assert.equal(orgThread.messages[0].sender_id, orgMe.id);
+  assert.equal(orgThread.messages[1].sender_id, vendorMe.id);
+  assert.match(orgThread.messages[1].text, /accommodate any dietary/);
+
+  // Validation: cannot send empty message
+  const emptyRes = await call('POST', '/api/messages', orgToken, {
+    receiver_id: vendorMe.id,
+    text: '   '
+  });
+  assert.equal(emptyRes.status, 400);
+});
+
 

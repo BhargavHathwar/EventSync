@@ -187,7 +187,7 @@ async function matchVendors(serviceId) {
     const competing = await pendingOverlapCount(v.id, event, event.id);
     const { match_probability, factors } = calculateMatchProbability(v, event, service, failures, competing, quote);
     const card = {
-      vendor_id: v.id, name: v.name, description: v.description, package: v.package,
+      vendor_id: v.id, user_id: v.user_id, name: v.name, description: v.description, package: v.package,
       rating: v.rating, price: v.price, price_unit: v.price_unit, quote,
       max_guests: v.max_guests, service_areas: v.service_areas,
       competing_requests: competing,
@@ -215,7 +215,12 @@ async function matchVendors(serviceId) {
 
 // ---------- status computation ----------
 async function serviceStatus(serviceId) {
-  const latest = await db.prepare('SELECT * FROM bookings WHERE event_service_id = ? ORDER BY id DESC LIMIT 1').get(serviceId);
+  const latest = await db.prepare(`
+    SELECT b.*, v.user_id AS vendor_user_id, v.name AS vendor_name
+    FROM bookings b
+    LEFT JOIN vendors v ON v.id = b.vendor_id
+    WHERE b.event_service_id = ? ORDER BY b.id DESC LIMIT 1
+  `).get(serviceId);
   if (!latest) return { status: 'unassigned', label: 'No vendor selected', booking: null };
   if (latest.status === 'requested') return { status: 'pending', label: 'Awaiting vendor response', booking: latest };
   if (latest.status === 'accepted') return { status: 'confirmed', label: 'Confirmed', booking: latest };

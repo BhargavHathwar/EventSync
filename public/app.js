@@ -13,6 +13,8 @@
     token: localStorage.getItem('es_token'),
     user: null,
     notif: { items: [], unread: 0 },
+    chatUnread: 0,
+    chatTimer: null,
     notifOpen: false,
     authMode: 'login',
     authRole: 'organizer',
@@ -753,9 +755,10 @@
   // ---------- app shell ----------
   function shell(active) {
     const org = state.user.role === 'organizer';
+    const msgCountBadge = state.chatUnread > 0 ? `<span class="nav-msg-count">${state.chatUnread}</span>` : '';
     const nav = org
-      ? [['/events', 'My events'], ['/events/new', 'New event']]
-      : [['/vendor/requests', 'Requests'], ['/vendor/commitments', 'Commitments'], ['/vendor/availability', 'Availability'], ['/vendor/profile', 'Profile']];
+      ? [['/events', 'My events'], ['/events/new', 'New event'], ['/messages', `Messages${msgCountBadge}`]]
+      : [['/vendor/requests', 'Requests'], ['/vendor/commitments', 'Commitments'], ['/vendor/availability', 'Availability'], ['/vendor/profile', 'Profile'], ['/messages', `Messages${msgCountBadge}`]];
 
     $('#app').innerHTML = `
     <header class="topbar">
@@ -765,7 +768,7 @@
           <span>EventSync</span>
         </a>
         <nav class="nav" aria-label="Main">
-          ${nav.map(([h, l]) => `<a href="#${h}" class="${active === h || (h === '/events' && /^\/events\/\d+/.test(active)) ? 'active' : ''}">${l}</a>`).join('')}
+          ${nav.map(([h, l]) => `<a href="#${h}" class="${active === h || (h === '/events' && /^\/events\/\d+/.test(active)) || (h === '/messages' && /^\/messages/.test(active)) ? 'active' : ''}">${l}</a>`).join('')}
         </nav>
         <div class="userbox">
           ${themeToggleMarkup()}
@@ -805,9 +808,13 @@
   async function refreshNotifs() {
     if (!state.token) return;
     try {
-      const n = await api('/notifications');
-      const changed = n.unread !== state.notif.unread;
+      const [n, c] = await Promise.all([
+        api('/notifications'),
+        api('/messages/unread/count').catch(() => ({ unread: 0 }))
+      ]);
+      const changed = n.unread !== state.notif.unread || (c && c.unread !== state.chatUnread);
       state.notif = n;
+      state.chatUnread = c ? c.unread : 0;
       return changed;
     } catch { }
   }
@@ -1049,6 +1056,10 @@
 
     const flag = x.status === 'attention' ? 'flag-red' : x.status === 'confirmed' ? 'flag-green' : x.status === 'pending' ? 'flag-amber' : '';
     const vendorName = b ? x.bookings?.find(k => k.id === b.id)?.vendor_name : '';
+    const vendorUserId = b?.vendor_user_id || x.bookings?.find(k => k.id === b?.id)?.vendor_user_id;
+    if (vendorUserId) {
+      actions = `<a href="#/messages/${vendorUserId}" class="btn outline small glow-btn" style="display:inline-flex;align-items:center;gap:6px;text-decoration:none">💬 Chat</a> ` + actions;
+    }
 
     return `
     <article class="card ${flag}">
@@ -1164,6 +1175,7 @@
                 <p class="tiny muted" style="text-align:right">${inr(m.price)} ${UNIT[m.price_unit]}</p>
               </div>
               <button class="btn primary glow-btn" style="margin-top:14px;width:100%" data-act="request" data-vendor="${m.vendor_id}">Request booking</button>
+              ${m.user_id ? `<a href="#/messages/${m.user_id}" onclick="closeModal()" class="btn outline tiny" style="margin-top:6px;width:100%;text-align:center;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:4px">💬 Chat with Vendor</a>` : ''}
             </div>
           </div>`).join('')
         : `<div class="empty"><h3>No vendor meets every requirement</h3><p class="muted">See why each vendor was excluded below. You can adjust the budget, date or city and search again.</p></div>`}
@@ -1283,10 +1295,15 @@
         <div class="row" style="margin-top:14px">
           <button class="btn good" data-act="accept" data-id="${b.id}" ${conflict ? 'disabled' : ''}>Accept booking</button>
           <button class="btn danger" data-act="decline" data-id="${b.id}">Decline</button>
+          ${b.organizer_id ? `<a href="#/messages/${b.organizer_id}" class="btn outline small glow-btn" style="display:inline-flex;align-items:center;gap:6px;text-decoration:none">💬 Chat with Organizer</a>` : ''}
         </div>`
         : b.status === 'accepted' ? `
         <div class="row" style="margin-top:14px">
           <button class="btn danger" data-act="cancelbooking" data-id="${b.id}" data-ask="Cancel this confirmed booking? The organizer will be told to find a replacement." data-reason="1">Cancel booking</button>
+          ${b.organizer_id ? `<a href="#/messages/${b.organizer_id}" class="btn outline small glow-btn" style="display:inline-flex;align-items:center;gap:6px;text-decoration:none">💬 Chat with Organizer</a>` : ''}
+        </div>` : b.organizer_id ? `
+        <div class="row" style="margin-top:14px">
+          <a href="#/messages/${b.organizer_id}" class="btn outline small glow-btn" style="display:inline-flex;align-items:center;gap:6px;text-decoration:none">💬 Chat with Organizer</a>
         </div>` : ''}
     </article>`;
   }
@@ -1411,6 +1428,316 @@
     apply3DTilt();
   }
 
+  // ---------- messaging view ----------
+  async function messagesView(v, initialPartnerId) {
+    if (state.chatTimer) {
+      clearInterval(state.chatTimer);
+      state.chatTimer = null;
+    }
+
+    v.innerHTML = `
+      <div class="chat-page">
+        <div class="page-head" style="margin-bottom:0">
+          <div>
+            <h1>Messages</h1>
+            <p class="muted">Live direct text messaging between event organizers and service vendors.</p>
+          </div>
+        </div>
+        <div class="chat-container">
+          <aside class="chat-sidebar">
+            <div class="chat-sidebar-head">
+              <div class="chat-sidebar-title">
+                <h2>💬 Conversations</h2>
+              </div>
+              <input type="text" class="chat-search-input" id="chat-filter-input" placeholder="🔍 Search conversations..." />
+            </div>
+            <div class="chat-conv-list" id="chat-conv-list">
+              <div style="padding:24px;text-align:center" class="muted">Loading conversations…</div>
+            </div>
+          </aside>
+          <section class="chat-main" id="chat-main-pane">
+            <div class="chat-empty-state">
+              <div class="chat-empty-icon">💬</div>
+              <h3>Select a conversation</h3>
+              <p class="muted">Choose an organizer or vendor from the left to start messaging.</p>
+            </div>
+          </section>
+        </div>
+      </div>
+    `;
+
+    apply3DTilt();
+
+    let conversations = [];
+    try {
+      const res = await api('/conversations');
+      conversations = res.conversations || [];
+    } catch (e) {
+      fail(e);
+      return;
+    }
+
+    let activePartnerId = initialPartnerId ? parseInt(initialPartnerId, 10) : null;
+    if (!activePartnerId && conversations.length > 0) {
+      activePartnerId = conversations[0].partner_id;
+    }
+
+    const convListEl = $('#chat-conv-list');
+    const mainPaneEl = $('#chat-main-pane');
+    const filterInput = $('#chat-filter-input');
+
+    function renderConversations(filterText = '') {
+      const q = filterText.trim().toLowerCase();
+      const filtered = conversations.filter(c => {
+        if (!q) return true;
+        return (c.partner_name && c.partner_name.toLowerCase().includes(q)) ||
+               (c.vendor_category && c.vendor_category.toLowerCase().includes(q)) ||
+               (c.context?.event_name && c.context.event_name.toLowerCase().includes(q)) ||
+               (c.last_message?.text && c.last_message.text.toLowerCase().includes(q));
+      });
+
+      if (!filtered.length) {
+        convListEl.innerHTML = `
+          <div style="padding:28px 16px;text-align:center" class="muted small">
+            ${conversations.length === 0 ? 'No conversations yet.<br><br>Book a vendor or open an event to start communicating!' : 'No conversations matching "' + esc(q) + '"'}
+          </div>
+        `;
+        return;
+      }
+
+      convListEl.innerHTML = filtered.map(c => {
+        const isActive = c.partner_id === activePartnerId;
+        const icon = c.partner_role === 'vendor' ? (ICON[c.vendor_category] || '🏢') : '👤';
+        const roleLabel = c.partner_role === 'vendor' ? `${cap(c.vendor_category || 'Vendor')}` : 'Organizer';
+        const timeStr = c.last_message ? new Date(c.last_message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+        const preview = c.last_message ? esc(c.last_message.text) : '<em>Click to start conversation</em>';
+
+        return `
+          <a class="chat-conv-item ${isActive ? 'active' : ''} ${c.unread_count > 0 ? 'unread' : ''}" data-conv-id="${c.partner_id}" href="#/messages/${c.partner_id}">
+            <div class="chat-avatar">${icon}</div>
+            <div class="chat-conv-body">
+              <div class="chat-conv-top">
+                <span class="chat-conv-name">${esc(c.partner_name)}</span>
+                ${timeStr ? `<span class="chat-conv-time">${timeStr}</span>` : ''}
+              </div>
+              <div class="chat-conv-context">
+                <span class="rolepill" style="font-size:10px;padding:1px 6px">${roleLabel}</span>
+                ${c.context?.event_name ? `<span>· ${esc(c.context.event_name)}</span>` : ''}
+              </div>
+              <div class="chat-conv-preview">${preview}</div>
+            </div>
+            ${c.unread_count > 0 ? `<span class="chat-unread-badge">${c.unread_count}</span>` : ''}
+          </a>
+        `;
+      }).join('');
+    }
+
+    if (filterInput) {
+      filterInput.addEventListener('input', e => {
+        renderConversations(e.target.value);
+      });
+    }
+
+    renderConversations();
+
+    let currentMsgCount = 0;
+    let activeThreadContext = null;
+
+    async function loadActiveThread(partnerId, isPolling = false) {
+      if (!partnerId) return;
+      try {
+        const threadData = await api('/messages/' + partnerId);
+        const { messages, partner, context } = threadData;
+        activeThreadContext = context;
+
+        if (isPolling && messages.length === currentMsgCount) {
+          return;
+        }
+
+        currentMsgCount = messages.length;
+
+        // Reset unread count for this partner in local conversations
+        const found = conversations.find(c => c.partner_id === partnerId);
+        if (found) {
+          found.unread_count = 0;
+          if (messages.length > 0) {
+            found.last_message = messages[messages.length - 1];
+          }
+        }
+        renderConversations(filterInput ? filterInput.value : '');
+
+        // Update nav badge count
+        await refreshNotifs();
+        const navCount = $('.nav-msg-count');
+        if (navCount) {
+          if (state.chatUnread > 0) navCount.textContent = state.chatUnread;
+          else navCount.remove();
+        }
+
+        const icon = partner.role === 'vendor' ? (ICON[partner.category] || '🏢') : '👤';
+        const roleLabel = partner.role === 'vendor' ? `${cap(partner.category || 'Vendor')}` : 'Organizer';
+
+        // Suggestion chips
+        const isOrg = state.user.role === 'organizer';
+        const chips = isOrg ? [
+          'Can you customize the package options?',
+          'What time will your team arrive for setup?',
+          'Is transportation/delivery included in the quote?',
+          'Looking forward to working together on this!'
+        ] : [
+          'Yes, we can customize that to your exact needs!',
+          'Our team arrives 1 hour prior to start time for setup.',
+          'All setup, delivery and teardown are fully included.',
+          'Thank you, excited for this event!'
+        ];
+
+        mainPaneEl.innerHTML = `
+          <header class="chat-header">
+            <div class="chat-header-user">
+              <div class="chat-avatar">${icon}</div>
+              <div class="chat-header-info">
+                <div class="chat-header-name">
+                  <span>${esc(partner.name)}</span>
+                  <span class="chat-status-dot" title="Active"></span>
+                </div>
+                <div class="chat-header-meta">
+                  <span class="rolepill">${roleLabel}</span>
+                  ${partner.rating ? `<span class="stars">★ ${partner.rating.toFixed(1)}</span>` : ''}
+                </div>
+              </div>
+            </div>
+            ${context ? `
+              <div class="chat-event-chip">
+                <span>🗓️ <b>${esc(context.event_name)}</b></span>
+                <span>· ${fmtDate(context.event_date)}</span>
+                ${badge(context.booking_status)}
+              </div>
+            ` : ''}
+          </header>
+
+          <div class="chat-messages" id="chat-messages-container">
+            <div class="chat-date-divider">Today</div>
+            ${messages.length === 0 ? `
+              <div class="chat-empty-state" style="padding:40px 0">
+                <div class="chat-empty-icon">👋</div>
+                <h4>Start the conversation</h4>
+                <p class="muted small">Send a message to discuss event details, timing, or requirements.</p>
+              </div>
+            ` : messages.map(m => {
+              const isOutgoing = m.sender_id === state.user.id;
+              const time = new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+              return `
+                <div class="msg-row ${isOutgoing ? 'outgoing' : 'incoming'}">
+                  <div class="msg-bubble">${esc(m.text)}</div>
+                  <div class="msg-meta">
+                    <span>${isOutgoing ? 'You' : esc(partner.name)} · ${time}</span>
+                    ${isOutgoing ? `<span class="msg-check" title="Delivered">✓✓</span>` : ''}
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+
+          <div class="chat-chips-bar">
+            ${chips.map(chip => `<button type="button" class="chat-chip" data-chip="${esc(chip)}">${esc(chip)}</button>`).join('')}
+          </div>
+
+          <form class="chat-input-bar" id="chat-send-form">
+            <textarea class="chat-textarea" id="chat-msg-input" placeholder="Type a message (Press Enter to send, Shift+Enter for new line)..." rows="1"></textarea>
+            <button type="submit" class="btn primary glow-btn chat-send-btn" id="chat-send-btn">
+              <span>Send</span>
+              <span>➤</span>
+            </button>
+          </form>
+        `;
+
+        const messagesContainer = $('#chat-messages-container');
+        if (messagesContainer) {
+          messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        const msgInput = $('#chat-msg-input');
+        const sendForm = $('#chat-send-form');
+
+        // Suggestion chip clicks
+        mainPaneEl.querySelectorAll('.chat-chip').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const chipText = btn.getAttribute('data-chip');
+            if (msgInput) {
+              msgInput.value = chipText;
+              msgInput.focus();
+            }
+          });
+        });
+
+        // Auto-expand textarea & Enter to send
+        if (msgInput) {
+          msgInput.addEventListener('keydown', e => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              sendForm.dispatchEvent(new Event('submit'));
+            }
+          });
+        }
+
+        // Form submit
+        sendForm.addEventListener('submit', async e => {
+          e.preventDefault();
+          const text = msgInput.value.trim();
+          if (!text) return;
+
+          const sendBtn = $('#chat-send-btn');
+          sendBtn.disabled = true;
+
+          try {
+            const sentRes = await api('/messages', 'POST', {
+              receiver_id: partnerId,
+              text,
+              booking_id: activeThreadContext?.booking_id || null
+            });
+
+            msgInput.value = '';
+            await loadActiveThread(partnerId, false);
+            const conv = conversations.find(c => c.partner_id === partnerId);
+            if (conv) {
+              conv.last_message = sentRes.message;
+              renderConversations(filterInput ? filterInput.value : '');
+            }
+          } catch (err) {
+            fail(err);
+          } finally {
+            sendBtn.disabled = false;
+            msgInput.focus();
+          }
+        });
+
+      } catch (err) {
+        mainPaneEl.innerHTML = `
+          <div class="empty" style="padding:40px">
+            <h3>Could not load conversation</h3>
+            <p class="muted">${esc(err.message)}</p>
+          </div>
+        `;
+      }
+    }
+
+    if (activePartnerId) {
+      await loadActiveThread(activePartnerId, false);
+    }
+
+    state.chatTimer = setInterval(async () => {
+      const currentRoute = route();
+      if (!currentRoute.startsWith('/messages')) {
+        clearInterval(state.chatTimer);
+        state.chatTimer = null;
+        return;
+      }
+      if (activePartnerId) {
+        await loadActiveThread(activePartnerId, true);
+      }
+    }, 3000);
+  }
+
   // ---------- render loop ----------
   async function render() {
     const my = ++renderId;
@@ -1423,7 +1750,7 @@
     const r = route();
     const org = state.user.role === 'organizer';
     if (org && r.startsWith('/vendor')) return go('/events');
-    if (!org && !r.startsWith('/vendor')) return go('/vendor/requests');
+    if (!org && !r.startsWith('/vendor') && !r.startsWith('/messages')) return go('/vendor/requests');
     await refreshNotifs();
     if (my !== renderId) return;
 
@@ -1438,6 +1765,7 @@
       else if (r === '/vendor/commitments') await vendorCommitments(v);
       else if (r === '/vendor/availability') await vendorAvailability(v);
       else if (r === '/vendor/profile') await vendorProfile(v);
+      else if (r === '/messages' || (m = r.match(/^\/messages\/(\d+)$/))) await messagesView(v, m ? m[1] : null);
       else go(org ? '/events' : '/vendor/requests');
     } catch (e) {
       v.innerHTML = `

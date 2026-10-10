@@ -170,7 +170,7 @@ app.get('/api/events/:id', requireAuth('organizer'), h(async (req, res) => {
   const summary = await L.eventSummary(event.id);
   for (const s of summary.services) {
     s.bookings = await db.prepare(`
-      SELECT b.*, v.name AS vendor_name, v.rating FROM bookings b JOIN vendors v ON v.id = b.vendor_id
+      SELECT b.*, v.name AS vendor_name, v.user_id AS vendor_user_id, v.rating FROM bookings b JOIN vendors v ON v.id = b.vendor_id
       WHERE b.event_service_id = ? ORDER BY b.id DESC`).all(s.id);
     for (const b of s.bookings) {
       b.history = await db.prepare('SELECT actor, action, note, at FROM booking_history WHERE booking_id = ? ORDER BY id').all(b.id);
@@ -286,7 +286,7 @@ app.get('/api/vendor/bookings', requireAuth('vendor'), h(async (req, res) => {
   const v = await myVendor(req);
   const rows = await db.prepare(`
     SELECT b.*, es.category, e.id AS event_id, e.name AS event_name, e.date, e.start_time, e.end_time,
-           e.city, e.venue, e.attendees, u.name AS organizer_name
+           e.city, e.venue, e.attendees, e.organizer_id, u.name AS organizer_name
     FROM bookings b
     JOIN event_services es ON es.id = b.event_service_id
     JOIN events e ON e.id = es.event_id
@@ -325,6 +325,213 @@ app.delete('/api/vendor/blocked/:id', requireAuth('vendor'), h(async (req, res) 
   const v = await myVendor(req);
   await db.prepare('DELETE FROM vendor_blocked_dates WHERE id = ? AND vendor_id = ?').run(req.params.id, v.id);
   res.json({ ok: true });
+}));
+
+// ---------------- messaging ----------------
+app.get('/api/conversations', requireAuth(), h(async (req, res) => {
+  const myId = req.user.id;
+  const myRole = req.user.role;
+
+  // 1. Gather all conversation partners from message history
+  const msgPartners = await db.prepare(`
+    SELECT DISTINCT CASE WHEN sender_id = ? THEN receiver_id ELSE sender_id END AS partner_id
+    FROM messages WHERE sender_id = ? OR receiver_id = ?
+  `).all(myId, myId, myId);
+
+  const partnerIdSet = new Set(msgPartners.map(p => p.partner_id));
+
+  // 2. Add partners from booking connections
+  if (myRole === 'organizer') {
+    const bookedVendors = await db.prepare(`
+      SELECT DISTINCT v.user_id AS partner_id
+      FROM events e
+      JOIN event_services es ON es.event_id = e.id
+      JOIN bookings b ON b.event_service_id = es.id
+      JOIN vendors v ON v.id = b.vendor_id
+      WHERE e.organizer_id = ?
+    `).all(myId);
+    bookedVendors.forEach(b => partnerIdSet.add(b.partner_id));
+
+    // Also include all vendors in system so organizer can message any vendor directly
+    const allVendors = await db.prepare('SELECT user_id AS partner_id FROM vendors').all();
+    allVendors.forEach(v => partnerIdSet.add(v.partner_id));
+  } else if (myRole === 'vendor') {
+    const vendorRow = await db.prepare('SELECT id FROM vendors WHERE user_id = ?').get(myId);
+    if (vendorRow) {
+      const bookedOrgs = await db.prepare(`
+        SELECT DISTINCT e.organizer_id AS partner_id
+        FROM bookings b
+        JOIN event_services es ON es.id = b.event_service_id
+        JOIN events e ON e.id = es.event_id
+        WHERE b.vendor_id = ?
+      `).all(vendorRow.id);
+      bookedOrgs.forEach(b => partnerIdSet.add(b.partner_id));
+    }
+  }
+
+  const conversations = [];
+  for (const pid of partnerIdSet) {
+    if (!pid || pid === myId) continue;
+    const partnerUser = await db.prepare('SELECT id, name, email, role FROM users WHERE id = ?').get(pid);
+    if (!partnerUser) continue;
+
+    let vendorInfo = null;
+    if (partnerUser.role === 'vendor') {
+      vendorInfo = await db.prepare('SELECT id, name, category, rating, price, price_unit FROM vendors WHERE user_id = ?').get(partnerUser.id);
+    }
+
+    const lastMsg = await db.prepare(`
+      SELECT * FROM messages
+      WHERE (sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)
+      ORDER BY id DESC LIMIT 1
+    `).get(myId, pid, pid, myId);
+
+    const unreadRow = await db.prepare(`
+      SELECT COUNT(*) AS c FROM messages
+      WHERE sender_id = ? AND receiver_id = ? AND is_read = 0
+    `).get(pid, myId);
+
+    let context = null;
+    if (myRole === 'organizer' && vendorInfo) {
+      context = await db.prepare(`
+        SELECT b.id AS booking_id, b.status AS booking_status, e.id AS event_id, e.name AS event_name, e.date AS event_date, es.category
+        FROM events e
+        JOIN event_services es ON es.event_id = e.id
+        JOIN bookings b ON b.event_service_id = es.id
+        WHERE e.organizer_id = ? AND b.vendor_id = ?
+        ORDER BY b.id DESC LIMIT 1
+      `).get(myId, vendorInfo.id);
+    } else if (myRole === 'vendor') {
+      const v = await db.prepare('SELECT id FROM vendors WHERE user_id = ?').get(myId);
+      if (v) {
+        context = await db.prepare(`
+          SELECT b.id AS booking_id, b.status AS booking_status, e.id AS event_id, e.name AS event_name, e.date AS event_date, es.category
+          FROM bookings b
+          JOIN event_services es ON es.id = b.event_service_id
+          JOIN events e ON e.id = es.event_id
+          WHERE b.vendor_id = ? AND e.organizer_id = ?
+          ORDER BY b.id DESC LIMIT 1
+        `).get(v.id, pid);
+      }
+    }
+
+    conversations.push({
+      partner_id: partnerUser.id,
+      partner_name: vendorInfo ? vendorInfo.name : partnerUser.name,
+      partner_role: partnerUser.role,
+      vendor_category: vendorInfo ? vendorInfo.category : null,
+      vendor_rating: vendorInfo ? vendorInfo.rating : null,
+      last_message: lastMsg || null,
+      unread_count: unreadRow ? Number(unreadRow.c) : 0,
+      context: context || null
+    });
+  }
+
+  conversations.sort((a, b) => {
+    const aId = a.last_message ? a.last_message.id : 0;
+    const bId = b.last_message ? b.last_message.id : 0;
+    if (aId !== bId) return bId - aId;
+    if (a.context && !b.context) return -1;
+    if (!a.context && b.context) return 1;
+    return a.partner_name.localeCompare(b.partner_name);
+  });
+
+  res.json({ conversations });
+}));
+
+app.get('/api/messages/unread/count', requireAuth(), h(async (req, res) => {
+  const row = await db.prepare('SELECT COUNT(*) AS c FROM messages WHERE receiver_id = ? AND is_read = 0').get(req.user.id);
+  res.json({ unread: row ? Number(row.c) : 0 });
+}));
+
+app.get('/api/messages/:partnerId', requireAuth(), h(async (req, res) => {
+  const myId = req.user.id;
+  const partnerId = parseInt(req.params.partnerId, 10);
+  if (!partnerId || partnerId === myId) throw new HttpError(400, 'Invalid partner');
+
+  const partnerUser = await db.prepare('SELECT id, name, email, role FROM users WHERE id = ?').get(partnerId);
+  if (!partnerUser) throw new HttpError(404, 'User not found');
+
+  let vendorInfo = null;
+  if (partnerUser.role === 'vendor') {
+    vendorInfo = await db.prepare('SELECT id, name, category, rating, price, price_unit FROM vendors WHERE user_id = ?').get(partnerUser.id);
+  }
+
+  // Mark all incoming messages from partnerId as read
+  await db.prepare('UPDATE messages SET is_read = 1 WHERE sender_id = ? AND receiver_id = ? AND is_read = 0')
+    .run(partnerId, myId);
+
+  const messages = await db.prepare(`
+    SELECT m.*, u.name AS sender_name
+    FROM messages m
+    JOIN users u ON u.id = m.sender_id
+    WHERE (m.sender_id = ? AND m.receiver_id = ?)
+       OR (m.sender_id = ? AND m.receiver_id = ?)
+    ORDER BY m.id ASC
+  `).all(myId, partnerId, partnerId, myId);
+
+  let context = null;
+  if (req.user.role === 'organizer' && vendorInfo) {
+    context = await db.prepare(`
+      SELECT b.id AS booking_id, b.status AS booking_status, e.id AS event_id, e.name AS event_name, e.date AS event_date, es.category
+      FROM events e
+      JOIN event_services es ON es.event_id = e.id
+      JOIN bookings b ON b.event_service_id = es.id
+      WHERE e.organizer_id = ? AND b.vendor_id = ?
+      ORDER BY b.id DESC LIMIT 1
+    `).get(myId, vendorInfo.id);
+  } else if (req.user.role === 'vendor') {
+    const v = await db.prepare('SELECT id FROM vendors WHERE user_id = ?').get(myId);
+    if (v) {
+      context = await db.prepare(`
+        SELECT b.id AS booking_id, b.status AS booking_status, e.id AS event_id, e.name AS event_name, e.date AS event_date, es.category
+        FROM bookings b
+        JOIN event_services es ON es.id = b.event_service_id
+        JOIN events e ON e.id = es.event_id
+        WHERE b.vendor_id = ? AND e.organizer_id = ?
+        ORDER BY b.id DESC LIMIT 1
+      `).get(v.id, partnerId);
+    }
+  }
+
+  res.json({
+    messages,
+    partner: {
+      id: partnerUser.id,
+      name: vendorInfo ? vendorInfo.name : partnerUser.name,
+      role: partnerUser.role,
+      category: vendorInfo ? vendorInfo.category : null,
+      rating: vendorInfo ? vendorInfo.rating : null
+    },
+    context
+  });
+}));
+
+app.post('/api/messages', requireAuth(), h(async (req, res) => {
+  const myId = req.user.id;
+  const receiverId = parseInt(req.body.receiver_id, 10);
+  const text = String(req.body.text || '').trim();
+  const bookingId = req.body.booking_id ? parseInt(req.body.booking_id, 10) : null;
+
+  if (!receiverId || receiverId === myId) throw new HttpError(400, 'Invalid message recipient');
+  if (!text) throw new HttpError(400, 'Message cannot be empty');
+  if (text.length > 3000) throw new HttpError(400, 'Message is too long (max 3000 characters)');
+
+  const receiver = await db.prepare('SELECT id, name FROM users WHERE id = ?').get(receiverId);
+  if (!receiver) throw new HttpError(404, 'Recipient not found');
+
+  const insertRes = await db.prepare(`
+    INSERT INTO messages (sender_id, receiver_id, text, booking_id, is_read)
+    VALUES (?, ?, ?, ?, 0)
+  `).run(myId, receiverId, text, bookingId);
+
+  const newId = insertRes.lastInsertRowid;
+  const msgRow = await db.prepare('SELECT * FROM messages WHERE id = ?').get(newId);
+
+  const preview = text.length > 120 ? text.slice(0, 120) + '…' : text;
+  await L.notify(receiverId, `💬 ${req.user.name}: "${preview}"`);
+
+  res.json({ ok: true, message: msgRow });
 }));
 
 // ---------------- errors ----------------
