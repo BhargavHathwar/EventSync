@@ -15,23 +15,27 @@ function verifyPassword(password, stored) {
   return crypto.timingSafeEqual(test, Buffer.from(hash, 'hex'));
 }
 
-function createSession(userId) {
+async function createSession(userId) {
   const token = crypto.randomBytes(32).toString('hex');
-  db.prepare('INSERT INTO sessions (token, user_id) VALUES (?, ?)').run(token, userId);
+  await db.prepare('INSERT INTO sessions (token, user_id) VALUES (?, ?)').run(token, userId);
   return token;
 }
 
 function requireAuth(role) {
-  return (req, res, next) => {
-    const header = req.headers.authorization || '';
-    const token = header.startsWith('Bearer ') ? header.slice(7) : null;
-    const user = token && db.prepare(`
-      SELECT u.id, u.name, u.email, u.role FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token = ?`).get(token);
-    if (!user) return next(new HttpError(401, 'Please sign in'));
-    if (role && user.role !== role) return next(new HttpError(403, `This action is for ${role}s only`));
-    req.user = user;
-    req.token = token;
-    next();
+  return async (req, res, next) => {
+    try {
+      const header = req.headers.authorization || '';
+      const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+      const user = token && (await db.prepare(`
+        SELECT u.id, u.name, u.email, u.role FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token = ?`).get(token));
+      if (!user) return next(new HttpError(401, 'Please sign in'));
+      if (role && user.role !== role) return next(new HttpError(403, `This action is for ${role}s only`));
+      req.user = user;
+      req.token = token;
+      next();
+    } catch (err) {
+      next(err);
+    }
   };
 }
 
