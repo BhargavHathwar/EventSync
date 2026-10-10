@@ -203,3 +203,23 @@ test('Organizer can cancel an event and booked vendors receive cancellation noti
   assert.equal(check.status, 404);
 });
 
+test('Vendor matches return a calculated probability score out of 100% based on requirements', async () => {
+  const org = await login('organizer@demo.com');
+  const { data: { events } } = await call('GET', '/api/events', org);
+  const techfest = events.find(e => e.name === 'College Tech Fest');
+  const cat = svc(techfest, 'catering');
+  const { data } = await call('GET', `/api/services/${cat.id}/matches`, org);
+
+  assert.ok(data.matches.length > 0);
+  for (const m of data.matches) {
+    assert.equal(typeof m.match_probability, 'number');
+    assert.ok(m.match_probability >= 0 && m.match_probability <= 100, 'probability must be 0-100%');
+    assert.ok(Array.isArray(m.probability_factors) && m.probability_factors.length > 0);
+  }
+  // Matches should be sorted primarily by highest probability
+  for (let i = 0; i < data.matches.length - 1; i++) {
+    assert.ok(data.matches[i].match_probability >= data.matches[i + 1].match_probability);
+  }
+});
+
+

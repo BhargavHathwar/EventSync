@@ -93,6 +93,74 @@ async function checkHardRequirements(vendor, event, service, { excludeBookingId 
   return { failures, quote };
 }
 
+function calculateMatchProbability(vendor, event, service, failures = [], competing = 0, quote = 0) {
+  // If the vendor is fundamentally unavailable or offers the wrong service:
+  if (failures.some(f => f.code === 'service' || f.code === 'booked' || f.code === 'unavailable' || f.code === 'active' || f.code === 'previous')) {
+    return { match_probability: 0, factors: ['Unavailable on event schedule or category mismatch'] };
+  }
+
+  let score = 25; // 25 points for category match
+  const factors = [`100% ${service.category} service category match`];
+
+  // Schedule availability (25 max)
+  const contentionDeduction = Math.min(10, competing * 3);
+  const availScore = Math.max(12, 25 - contentionDeduction);
+  score += availScore;
+  if (competing > 0) factors.push(`${competing} competing request(s) on date (-${contentionDeduction}%)`);
+  else factors.push('Zero schedule conflicts on date (+25%)');
+
+  // Location coverage (20 max)
+  const areas = (vendor.service_areas || '').split(',').map(a => a.trim().toLowerCase());
+  const cityMatch = areas.includes(event.city.trim().toLowerCase());
+  if (cityMatch) {
+    score += 20;
+    factors.push(`Verified service area: ${event.city} (+20%)`);
+  } else {
+    factors.push(`Does not service ${event.city} (0%)`);
+  }
+
+  // Capacity fit (15 max)
+  if (!vendor.max_guests || event.attendees <= vendor.max_guests) {
+    if (vendor.max_guests && event.attendees >= vendor.max_guests * 0.4) {
+      score += 15;
+      factors.push(`Optimal guest capacity (${event.attendees}/${vendor.max_guests} attendees) (+15%)`);
+    } else {
+      score += 13;
+      factors.push(`Capacity verified for ${event.attendees} guests (+13%)`);
+    }
+  } else {
+    factors.push(`Exceeds vendor max capacity of ${vendor.max_guests} guests (0%)`);
+  }
+
+  // Budget alignment (15 max)
+  if (!service.budget) {
+    score += 14;
+    factors.push('Flexible budget alignment (+14%)');
+  } else if (quote <= service.budget) {
+    const ratio = quote / service.budget;
+    if (ratio <= 0.8) {
+      score += 15;
+      factors.push(`High budget efficiency: ${inr(quote)} vs ${inr(service.budget)} limit (+15%)`);
+    } else {
+      score += 13;
+      factors.push(`Within allocated budget: ${inr(quote)} (+13%)`);
+    }
+  } else {
+    const overPct = (quote - service.budget) / service.budget;
+    const budScore = Math.max(0, Math.round(15 - overPct * 30));
+    score += budScore;
+    factors.push(`Quote ${inr(quote)} exceeds budget ${inr(service.budget)}`);
+  }
+
+  // Quality & Rating bonus (max 5)
+  const ratingBonus = Math.max(0, Math.min(5, Math.round(((vendor.rating || 4.0) - 3.5) * 3)));
+  score += ratingBonus;
+  factors.push(`★ ${vendor.rating.toFixed(1)} rating quality factor (+${ratingBonus}%)`);
+
+  const match_probability = Math.max(0, Math.min(failures.length === 0 ? 99 : 85, Math.round(score)));
+  return { match_probability, factors };
+}
+
 // ---------- matching engine ----------
 async function matchVendors(serviceId) {
   const service = await db.prepare('SELECT * FROM event_services WHERE id = ?').get(serviceId);
@@ -117,11 +185,14 @@ async function matchVendors(serviceId) {
     }
 
     const competing = await pendingOverlapCount(v.id, event, event.id);
+    const { match_probability, factors } = calculateMatchProbability(v, event, service, failures, competing, quote);
     const card = {
       vendor_id: v.id, name: v.name, description: v.description, package: v.package,
       rating: v.rating, price: v.price, price_unit: v.price_unit, quote,
       max_guests: v.max_guests, service_areas: v.service_areas,
       competing_requests: competing,
+      match_probability,
+      probability_factors: factors,
     };
 
     if (failures.length) excluded.push({ ...card, reasons: failures.map(f => f.message) });
@@ -137,8 +208,8 @@ async function matchVendors(serviceId) {
     }
   }
 
-  // Preferences only rank vendors that already satisfy every hard requirement.
-  matches.sort((a, b) => a.quote - b.quote || b.rating - a.rating);
+  // Preferences rank vendors by match probability out of 100%, then quote, then rating.
+  matches.sort((a, b) => b.match_probability - a.match_probability || a.quote - b.quote || b.rating - a.rating);
   return { service, event, matches, excluded };
 }
 

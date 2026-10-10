@@ -1094,7 +1094,7 @@
   async function openMatch(serviceId) {
     try {
       const data = await api(`/services/${serviceId}/matches`);
-      state.match = { serviceId, data, sort: 'price' };
+      state.match = { serviceId, data, sort: 'probability' };
       drawMatch();
     } catch (e) { fail(e); }
   }
@@ -1102,7 +1102,13 @@
   function drawMatch() {
     const { data, sort } = state.match;
     const { service, event, excluded } = data;
-    const matches = [...data.matches].sort(sort === 'rating' ? (a, b) => b.rating - a.rating : (a, b) => a.quote - b.quote);
+    const sortMode = sort || 'probability';
+    const matches = [...data.matches].sort(
+      sortMode === 'rating' ? (a, b) => b.rating - a.rating :
+      sortMode === 'price' ? (a, b) => a.quote - b.quote :
+      (a, b) => (b.match_probability ?? 0) - (a.match_probability ?? 0) || a.quote - b.quote || b.rating - a.rating
+    );
+
     openModal(`
       <div class="modal-head">
         <div>
@@ -1116,27 +1122,48 @@
         <button class="xbtn" data-act="closemodal" aria-label="Close">×</button>
       </div>
       <div class="modal-body">
-        <div class="row between" style="margin-bottom:16px">
+        <div class="prob-intro-banner">
+          <span style="font-size:20px">🎯</span>
+          <div>
+            <b>Vendor Match Probability Engine</b>
+            <p class="tiny muted" style="margin:2px 0 0">Vendors are evaluated against your date, guest count (${event.attendees}), city (${esc(event.city)}), and budget (${service.budget ? inr(service.budget) : 'flexible'}). Probability score reflects overall booking compatibility out of 100%.</p>
+          </div>
+        </div>
+
+        <div class="row between" style="margin:16px 0;align-items:center">
           <b>${matches.length} vendor${matches.length === 1 ? '' : 's'} can serve this event</b>
           <div class="seg" role="group" aria-label="Sort">
-            <button data-act="sort" data-sort="price" class="${sort === 'price' ? 'on' : ''}">Lowest price</button>
-            <button data-act="sort" data-sort="rating" class="${sort === 'rating' ? 'on' : ''}">Top rated</button>
+            <button data-act="sort" data-sort="probability" class="${sortMode === 'probability' ? 'on' : ''}">Probability match %</button>
+            <button data-act="sort" data-sort="price" class="${sortMode === 'price' ? 'on' : ''}">Lowest price</button>
+            <button data-act="sort" data-sort="rating" class="${sortMode === 'rating' ? 'on' : ''}">Top rated</button>
           </div>
         </div>
         ${matches.length ? matches.map(m => `
           <div class="card match">
-            <div>
-              <h3>${esc(m.name)} <span class="stars">★ ${m.rating.toFixed(1)}</span></h3>
-              <p class="small muted" style="margin-top:4px">${esc(m.package || m.description)}</p>
-              <ul class="reasons">
+            <div style="flex:1">
+              <div class="row" style="align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap">
+                <h3 style="margin:0">${esc(m.name)} <span class="stars">★ ${m.rating.toFixed(1)}</span></h3>
+                <div class="match-score-badge ${m.match_probability >= 90 ? 'score-high' : m.match_probability >= 75 ? 'score-mid' : 'score-low'}">
+                  <span class="score-percent">${m.match_probability ?? 95}%</span>
+                  <span class="score-label">Match</span>
+                </div>
+              </div>
+              <div class="prob-progress-track" title="${m.match_probability}% Requirement Match Probability">
+                <div class="prob-progress-bar" style="width:${m.match_probability}%"></div>
+              </div>
+              <p class="small muted" style="margin-top:8px">${esc(m.package || m.description)}</p>
+              <ul class="reasons" style="margin-top:10px">
+                <li style="color:#7dd3fc;font-weight:600">🎯 ${m.match_probability}% Overall Requirement Match for this event</li>
                 ${m.reasons.map(r => `<li>${esc(r)}</li>`).join('')}
               </ul>
               ${m.competing_requests ? `<div class="warn">${m.competing_requests} other event${m.competing_requests > 1 ? 's have' : ' has'} a pending request for this vendor at an overlapping time. Your request is not a confirmation until they accept.</div>` : ''}
             </div>
-            <div>
-              <div class="price">${inr(m.quote)}</div>
-              <p class="tiny" style="text-align:right">${inr(m.price)} ${UNIT[m.price_unit]}</p>
-              <button class="btn primary" style="margin-top:12px;width:100%" data-act="request" data-vendor="${m.vendor_id}">Request booking</button>
+            <div style="text-align:right;min-width:145px;display:flex;flex-direction:column;justify-content:space-between">
+              <div>
+                <div class="price">${inr(m.quote)}</div>
+                <p class="tiny muted" style="text-align:right">${inr(m.price)} ${UNIT[m.price_unit]}</p>
+              </div>
+              <button class="btn primary glow-btn" style="margin-top:14px;width:100%" data-act="request" data-vendor="${m.vendor_id}">Request booking</button>
             </div>
           </div>`).join('')
         : `<div class="empty"><h3>No vendor meets every requirement</h3><p class="muted">See why each vendor was excluded below. You can adjust the budget, date or city and search again.</p></div>`}
@@ -1145,13 +1172,20 @@
             <summary style="cursor:pointer;font-weight:600;color:var(--text-secondary);margin-bottom:8px">${excluded.length} vendor${excluded.length > 1 ? 's' : ''} not currently qualified for this event</summary>
             ${excluded.map(m => {
               const budgetIssue = m.reasons.some(r => /exceeds service budget/i.test(r));
+              const prob = m.match_probability || 0;
               return `
               <div class="card" style="margin-top:8px;border-left:${budgetIssue ? '3px solid #38bdf8' : '1px solid var(--line)'}">
                 <div class="row between" style="align-items:flex-start;gap:12px">
                   <div style="flex:1">
-                    <div style="display:flex;align-items:center;gap:8px">
+                    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
                       <b>${esc(m.name)}</b>
                       <span class="stars">★ ${m.rating.toFixed(1)}</span>
+                      ${prob > 0 ? `
+                        <div class="match-score-badge ${prob >= 75 ? 'score-mid' : 'score-low'}">
+                          <span class="score-percent">${prob}%</span>
+                          <span class="score-label">Compatibility</span>
+                        </div>
+                      ` : ''}
                     </div>
                     ${m.package ? `<p class="tiny muted" style="margin-top:3px">${esc(m.package)}</p>` : ''}
                     <ul class="reasons bad" style="margin-top:6px">${m.reasons.map(r => `<li>${esc(r)}</li>`).join('')}</ul>
@@ -1573,11 +1607,11 @@
           await api('/events/' + id, 'DELETE');
           closeModal();
           toast('Event cancelled successfully');
-          location.hash = '/events';
-          render();
+          go('/events');
         } catch (e) {
           fail(e);
           t.disabled = false;
+          t.textContent = 'Yes, Cancel Event';
         }
       }
       else if (act === 'changesvcbudget') {
