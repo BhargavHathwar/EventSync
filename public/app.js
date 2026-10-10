@@ -573,182 +573,113 @@
     </div>
     <div class="field" style="margin-top:16px"><label for="vf-desc">About your service</label><textarea id="vf-desc" name="description" rows="2" placeholder="Tell organizers what makes your service exceptional...">${esc(v.description)}</textarea></div>`;
 
-  // ---------- redesigned auth view ----------
+  // ---------- minimal auth view ----------
   function authView() {
     const reg = state.authMode === 'register';
+    const isVendor = reg && state.authRole === 'vendor';
+
     $('#app').innerHTML = `
-    <div class="auth-wrap">
-      <div class="auth-top-actions">
-        ${themeToggleMarkup()}
+    <div class="auth-minimal-page">
+      <div class="auth-top-bar">
+        <a class="brand" href="#" style="font-size:22px">
+          <span class="brand-logo-badge">ES</span>
+          <span>EventSync</span>
+        </a>
+        <div>
+          ${themeToggleMarkup()}
+        </div>
       </div>
-      <section class="auth-hero">
-        <div>
-          <a class="brand" href="#" style="font-size:24px">
-            <span class="brand-logo-badge">ES</span>
-            <span>EventSync</span>
-          </a>
-          <div class="auth-pill"><span class="pulse-dot"></span> Next-Gen Event Coordination Engine</div>
-          <h1>Every vendor. One event.<br><span class="hero-highlight">Perfectly Coordinated.</span></h1>
-          <p class="hero-desc">Describe your event once. EventSync seamlessly matches verified vendors free on your date, capable of handling your guest count and city, with live state synchronization.</p>
+
+      <div class="auth-minimal-card ${isVendor ? 'wide' : ''}">
+        <div class="auth-minimal-header">
+          <h2>${reg ? 'Create account' : 'Welcome back'}</h2>
+          <p>${reg ? 'Join to coordinate events or offer vendor services' : 'Sign in to access your event coordination dashboard'}</p>
         </div>
 
-        <div class="auth-hero-3d-box" id="auth-hero-canvas-wrap" title="Interactive 3D Event Coordination Lattice - Hover to interact">
-          <div class="hud-tag"><span class="hud-pulse"></span> 3D Coordination Lattice · Live</div>
-          <div class="hud-corner top-left"></div>
-          <div class="hud-corner top-right"></div>
-          <div class="hud-corner bottom-left"></div>
-          <div class="hud-corner bottom-right"></div>
+        <div class="auth-tabs" role="group" aria-label="Sign in or Register">
+          <button type="button" data-act="authmode" class="auth-tab ${!reg ? 'active' : ''}">Sign In</button>
+          <button type="button" data-act="authmode" class="auth-tab ${reg ? 'active' : ''}">Register</button>
         </div>
 
-        <div>
-          <div class="sync-demo" aria-hidden="true">
-            <div class="sync-demo-item">
-              <div class="sync-demo-left">
-                <span class="sync-demo-icon">🍽️</span>
-                <div>
-                  <div class="sync-demo-name">Catering</div>
-                  <div class="sync-demo-sub">300 Guests · Multi-Course</div>
-                </div>
-              </div>
-              <span class="badge confirmed">Confirmed · Ready</span>
-            </div>
-            <div class="sync-demo-item">
-              <div class="sync-demo-left">
-                <span class="sync-demo-icon">🎨</span>
-                <div>
-                  <div class="sync-demo-name">Decoration</div>
-                  <div class="sync-demo-sub">Theme: Sapphire Prism</div>
-                </div>
-              </div>
-              <span class="badge pending">Matching · In Progress</span>
-            </div>
-            <div class="sync-demo-item">
-              <div class="sync-demo-left">
-                <span class="sync-demo-icon">🔊</span>
-                <div>
-                  <div class="sync-demo-name">Sound & Audio</div>
-                  <div class="sync-demo-sub">Conflict Self-Healing</div>
-                </div>
-              </div>
-              <span class="badge attention">Auto-Resolving · Replacement</span>
-            </div>
-          </div>
-          <div class="auth-trust-bar">
-            <span>🛡️ Conflict-Free Guarantee</span>
-            <span>⚡ Real-Time Availability Sync</span>
-          </div>
-        </div>
-      </section>
-
-      <section class="auth-form-wrap">
-        <div class="auth-form-card">
-          <div class="row between" style="margin-bottom:18px;align-items:center">
-            <div>
-              <h2 style="font-size:26px;letter-spacing:-0.03em">${reg ? 'Create Account' : 'Welcome Back'}</h2>
-              <p class="subtitle" style="margin-top:4px">${reg ? 'Join as an organizer or local vendor' : 'Sign in to manage and coordinate your events'}</p>
-            </div>
-            <div class="seg auth-seg" role="group" aria-label="Auth Mode">
-              <button type="button" data-act="authmode" class="${!reg ? 'on' : ''}">Sign In</button>
-              <button type="button" data-act="authmode" class="${reg ? 'on' : ''}">Register</button>
-            </div>
-          </div>
-
-          <form data-form="${reg ? 'register' : 'login'}" class="stack" ${reg ? 'novalidate' : ''}>
-            ${reg ? `
-              <div class="role-selector-3d" role="group" aria-label="Account type">
-                <button type="button" data-act="role" data-role="organizer" class="role-btn ${state.authRole === 'organizer' ? 'on' : ''}">
-                  <span class="role-icon">🎯</span>
-                  <div class="role-info">
-                    <span class="role-title">Organizer</span>
-                    <div class="role-desc">Plan events & coordinate vendors</div>
-                  </div>
-                </button>
-                <button type="button" data-act="role" data-role="vendor" class="role-btn ${state.authRole === 'vendor' ? 'on' : ''}">
-                  <span class="role-icon">🎪</span>
-                  <div class="role-info">
-                    <span class="role-title">Vendor</span>
-                    <div class="role-desc">Get booked & manage schedule</div>
-                  </div>
-                </button>
-              </div>
-              <div class="field">
-                <label for="a-name">Full name</label>
-                <input id="a-name" name="uname" placeholder="Bhargav Hathwar" required>
-              </div>` : ''}
-
-            <div class="field">
-              <label for="a-email">Email address</label>
-              <input id="a-email" type="email" name="email" placeholder="name@domain.com" required>
+        <form data-form="${reg ? 'register' : 'login'}" class="stack auth-form" ${reg ? 'novalidate' : ''}>
+          ${reg ? `
+            <div class="role-pill-switch" role="group" aria-label="Account type">
+              <button type="button" data-act="role" data-role="organizer" class="role-pill-btn ${state.authRole === 'organizer' ? 'active' : ''}">
+                <span>🎯</span>
+                <span>Organizer</span>
+              </button>
+              <button type="button" data-act="role" data-role="vendor" class="role-pill-btn ${state.authRole === 'vendor' ? 'active' : ''}">
+                <span>🎪</span>
+                <span>Vendor</span>
+              </button>
             </div>
 
             <div class="field">
-              <label for="a-pw">Password</label>
-              <input id="a-pw" type="password" name="password" placeholder="••••••••" required>
-              ${reg ? '<div class="hint">At least 8 characters, with a letter and a number.</div>' : ''}
+              <label for="a-name">Full name</label>
+              <input id="a-name" name="uname" placeholder="Bhargav Hathwar" required autocomplete="name">
+            </div>` : ''}
+
+          <div class="field">
+            <label for="a-email">Email address</label>
+            <input id="a-email" type="email" name="email" placeholder="name@domain.com" required autocomplete="email">
+          </div>
+
+          <div class="field">
+            <label for="a-pw">Password</label>
+            <input id="a-pw" type="password" name="password" placeholder="••••••••" required autocomplete="${reg ? 'new-password' : 'current-password'}">
+            ${reg ? '<div class="hint">At least 8 characters, with a letter and a number.</div>' : ''}
+          </div>
+
+          ${reg ? `
+            <div class="field">
+              <label for="a-cpw">Confirm password</label>
+              <input id="a-cpw" type="password" name="confirmPassword" placeholder="••••••••" required autocomplete="new-password">
             </div>
+            <p id="a-err" role="alert" style="display:none;color:var(--red);font-size:13.5px;margin:0"></p>` : ''}
 
-            ${reg ? `
-              <div class="field">
-                <label for="a-cpw">Confirm password</label>
-                <input id="a-cpw" type="password" name="confirmPassword" placeholder="••••••••" required>
-              </div>
-              <p id="a-err" role="alert" style="display:none;color:#f87171;font-size:14px;margin:0"></p>` : ''}
+          ${reg && state.authRole === 'vendor' ? `
+            <fieldset style="margin-top:6px;padding:16px;border-radius:12px;border:1px solid var(--line-strong);background:var(--bg-surface)">
+              <legend style="padding:0 8px;font-size:13px;font-weight:600;color:var(--text-secondary)">Business & Service Profile</legend>
+              ${vendorFields({ max_concurrent: 1, price_unit: 'flat' })}
+            </fieldset>` : ''}
 
-            ${reg && state.authRole === 'vendor' ? `
-              <fieldset>
-                <legend>Business & Service Profile</legend>
-                ${vendorFields({ max_concurrent: 1, price_unit: 'flat' })}
-              </fieldset>` : ''}
+          <button class="btn primary glow-btn" type="submit" style="width:100%;padding:12px;margin-top:8px;font-size:15px;font-weight:600">
+            ${reg ? 'Create My Account' : 'Sign In'}
+          </button>
+        </form>
 
-            <button class="btn primary glow-btn" type="submit" style="width:100%;padding:13px;margin-top:8px;font-size:15px;font-weight:700">
-              ${reg ? 'Create My Account' : 'Sign In to EventSync'}
+        <p class="small muted" style="margin-top:16px;text-align:center">
+          ${reg ? 'Already have an account?' : "Don't have an account yet?"}
+          <button class="linkbtn" style="color:var(--accent-sky);font-weight:600;margin-left:4px" data-act="authmode">
+            ${reg ? 'Sign in here' : 'Register here'}
+          </button>
+        </p>
+
+        <div class="auth-demo-section">
+          <div class="auth-demo-divider">
+            <span>⚡ Instant Demo Access</span>
+          </div>
+          <div class="auth-demo-chips">
+            <button type="button" class="auth-demo-chip" data-act="demo" data-email="organizer@demo.com" title="Tech Fest Organizer">
+              <span>🎯 Organizer</span>
             </button>
-          </form>
-
-          <p class="small muted" style="margin-top:16px;text-align:center">
-            ${reg ? 'Already have an account?' : "Don't have an account yet?"}
-            <button class="linkbtn" style="color:var(--primary);font-weight:600" data-act="authmode">
-              ${reg ? 'Sign in here' : 'Create an account'}
+            <button type="button" class="auth-demo-chip" data-act="demo" data-email="royalbanquet@demo.com" title="Royal Banquet Catering">
+              <span>🍽️ Catering</span>
             </button>
-          </p>
-
-          <div class="demo-box">
-            <header>
-              <span class="small" style="font-weight:700">⚡ 1-Click Demo Sandbox</span>
-              <span class="tiny muted">password: demo123</span>
-            </header>
-            <div class="demo-grid">
-              <div class="demo-chip" data-act="demo" data-email="organizer@demo.com">
-                <span>🎯 Tech Fest Organizer (Bengaluru)</span>
-                <span class="chip-role">Organizer</span>
-              </div>
-              <div class="demo-chip" data-act="demo" data-email="organizer2@demo.com">
-                <span>🏢 Corporate Day Organizer (Mysuru)</span>
-                <span class="chip-role">Organizer</span>
-              </div>
-              <div class="demo-chip" data-act="demo" data-email="royalbanquet@demo.com">
-                <span>🍽️ Royal Banquet</span>
-                <span class="chip-role">Catering</span>
-              </div>
-              <div class="demo-chip" data-act="demo" data-email="auroraflowers@demo.com">
-                <span>🎨 Aurora Floral Decor</span>
-                <span class="chip-role">Decoration</span>
-              </div>
-              <div class="demo-chip" data-act="demo" data-email="shutterstories@demo.com">
-                <span>📷 Shutter Stories Studio</span>
-                <span class="chip-role">Photography</span>
-              </div>
-              <div class="demo-chip" data-act="demo" data-email="pulsepro@demo.com">
-                <span>🔊 PulsePro Sound</span>
-                <span class="chip-role">Sound</span>
-              </div>
-            </div>
+            <button type="button" class="auth-demo-chip" data-act="demo" data-email="auroraflowers@demo.com" title="Aurora Floral Decor">
+              <span>🎨 Decor</span>
+            </button>
+            <button type="button" class="auth-demo-chip" data-act="demo" data-email="shutterstories@demo.com" title="Shutter Stories Studio">
+              <span>📷 Photography</span>
+            </button>
+            <button type="button" class="auth-demo-chip" data-act="demo" data-email="pulsepro@demo.com" title="PulsePro Sound">
+              <span>🔊 Sound</span>
+            </button>
           </div>
         </div>
-      </section>
+      </div>
     </div>`;
 
-    initAuthHero3D();
     apply3DTilt();
   }
 

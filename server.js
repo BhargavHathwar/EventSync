@@ -8,7 +8,13 @@ const { seedIfEmpty } = require('./seed');
 const { HttpError } = L;
 const app = express();
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), {
+  etag: false,
+  maxAge: 0,
+  setHeaders: (res) => {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  }
+}));
 
 // Ensure database and initial demo data are ready before any HTTP handler executes
 let readyPromise = null;
