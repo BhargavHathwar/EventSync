@@ -94,6 +94,70 @@
   const closeModal = () => { $('#modal-root').innerHTML = ''; state.match = null; };
   const route = () => location.hash.replace(/^#/, '') || (state.user?.role === 'vendor' ? '/vendor/requests' : '/events');
 
+  // ---------- Theme Management (Light & Dark Mode) ----------
+  function getTheme() {
+    return document.documentElement.getAttribute('data-theme') ||
+      localStorage.getItem('eventsync-theme') ||
+      (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+  }
+
+  function updateThreeTheme(theme) {
+    const isLight = theme === 'light';
+    const canvas = document.getElementById('bg-canvas-3d');
+    if (canvas) {
+      canvas.style.opacity = isLight ? '0.35' : '0.65';
+    }
+    if (bgParticles && bgParticles.material) {
+      bgParticles.material.opacity = isLight ? 0.45 : 0.7;
+      bgParticles.material.blending = isLight ? THREE.NormalBlending : THREE.AdditiveBlending;
+      bgParticles.material.needsUpdate = true;
+    }
+    if (bgShapesGroup) {
+      bgShapesGroup.children.forEach(c => {
+        if (c.material) {
+          c.material.color.setHex(isLight ? 0x4f46e5 : 0x6366f1);
+          c.material.opacity = isLight ? 0.08 : 0.15;
+          c.material.needsUpdate = true;
+        }
+      });
+    }
+  }
+
+  function setTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    const meta = document.querySelector('meta[name="color-scheme"]');
+    if (meta) meta.content = theme;
+    try { localStorage.setItem('eventsync-theme', theme); } catch (e) {}
+    updateThreeTheme(theme);
+    document.querySelectorAll('.theme-toggle-btn').forEach(btn => {
+      btn.setAttribute('data-theme', theme);
+      btn.setAttribute('aria-label', `Toggle theme, currently ${theme} mode`);
+      const lbl = btn.querySelector('.theme-toggle-label');
+      if (lbl) lbl.textContent = theme === 'light' ? 'Light' : 'Dark';
+    });
+  }
+
+  function toggleTheme() {
+    const current = getTheme();
+    const next = current === 'light' ? 'dark' : 'light';
+    setTheme(next);
+    toast(`Switched to ${next === 'light' ? 'Light' : 'Dark'} mode ✨`);
+  }
+
+  function themeToggleMarkup() {
+    const t = getTheme();
+    return `
+      <button type="button" class="theme-toggle-btn" data-act="toggle-theme" data-theme="${t}" aria-label="Toggle theme, currently ${t} mode" title="Switch between Light and Dark mode">
+        <span class="theme-toggle-track" aria-hidden="true">
+          <span class="theme-toggle-thumb">
+            <span class="icon-moon">🌙</span>
+            <span class="icon-sun">☀️</span>
+          </span>
+        </span>
+        <span class="theme-toggle-label">${t === 'light' ? 'Light' : 'Dark'}</span>
+      </button>`;
+  }
+
   // ---------- 3D Three.js Engine ----------
   let bgRenderer, bgScene, bgCamera, bgParticles, bgShapesGroup, bgAnimId;
   function initBackground3D() {
@@ -172,6 +236,8 @@
       bgShapesGroup.add(mesh);
     }
     bgScene.add(bgShapesGroup);
+
+    updateThreeTheme(getTheme());
 
     let mouseX = 0, mouseY = 0;
     window.addEventListener('mousemove', (e) => {
@@ -393,6 +459,9 @@
     const reg = state.authMode === 'register';
     $('#app').innerHTML = `
     <div class="auth-wrap">
+      <div class="auth-top-actions">
+        ${themeToggleMarkup()}
+      </div>
       <section class="auth-hero">
         <div>
           <a class="brand" href="#" style="font-size:24px">
@@ -478,7 +547,7 @@
 
           <p class="small muted" style="margin-top:16px;text-align:center">
             ${reg ? 'Already have an account?' : "Don't have an account yet?"}
-            <button class="linkbtn" style="color:#818cf8;font-weight:600" data-act="authmode">
+            <button class="linkbtn" style="color:var(--primary);font-weight:600" data-act="authmode">
               ${reg ? 'Sign in here' : 'Create an account'}
             </button>
           </p>
@@ -501,13 +570,17 @@
                 <span>🍽️ Royal Banquet</span>
                 <span class="chip-role">Catering</span>
               </div>
+              <div class="demo-chip" data-act="demo" data-email="auroraflowers@demo.com">
+                <span>🎨 Aurora Floral Decor</span>
+                <span class="chip-role">Decoration</span>
+              </div>
+              <div class="demo-chip" data-act="demo" data-email="shutterstories@demo.com">
+                <span>📷 Shutter Stories Studio</span>
+                <span class="chip-role">Photography</span>
+              </div>
               <div class="demo-chip" data-act="demo" data-email="pulsepro@demo.com">
                 <span>🔊 PulsePro Sound</span>
                 <span class="chip-role">Sound</span>
-              </div>
-              <div class="demo-chip" data-act="demo" data-email="lenscraft@demo.com">
-                <span>📷 LensCraft</span>
-                <span class="chip-role">Photography</span>
               </div>
             </div>
           </div>
@@ -537,6 +610,7 @@
           ${nav.map(([h, l]) => `<a href="#${h}" class="${active === h || (h === '/events' && /^\/events\/\d+/.test(active)) ? 'active' : ''}">${l}</a>`).join('')}
         </nav>
         <div class="userbox">
+          ${themeToggleMarkup()}
           <button class="bell" data-act="bell" aria-label="Notifications, ${state.notif.unread} unread">
             🔔${state.notif.unread ? `<span class="count">${state.notif.unread}</span>` : ''}
           </button>
@@ -1176,6 +1250,7 @@
       return;
     }
     const act = t.dataset.act;
+    if (act === 'toggle-theme') { toggleTheme(); return; }
     if (act === 'overlay') { if (ev.target === t) closeModal(); return; }
     try {
       if (act === 'authmode') {

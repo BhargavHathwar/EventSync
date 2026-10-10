@@ -46,16 +46,30 @@ If `DATABASE_URL` is omitted, EventSync automatically falls back to embedded SQL
 
 ---
 
+## Theme Customization (Light & Dark Mode)
+EventSync includes a **Theme Toggle Switch** accessible from both the authentication landing screen and the top navigation bar.
+- **Dark Mode**: Immersive deep space aesthetic with neon glow accents and glowing 3D particle constellation.
+- **Light Mode**: Crisp pearl frosted-glass aesthetic with soft slate typography, pastel status indicators, and subtle floating crystal dust.
+- **Persistence & FOUC Prevention**: Remembers user choice in `localStorage` (`eventsync-theme`) and prevents flash of unstyled content on reload.
+
+---
+
 ## Demo Accounts (password `demo123`)
 | Role | Email | Notes |
 |---|---|---|
-| Organizer | organizer@demo.com | "College Tech Fest", 300 guests, nothing booked yet |
+| Organizer | organizer@demo.com | "College Tech Fest", 300 guests, fresh coordination |
 | Organizer | organizer2@demo.com | "Corporate Annual Day", same day, overlapping 14:00–20:00 |
-| Vendor | royalbanquet@demo.com | Has a pending request from Corporate Day (competing request) |
-| Vendor | lenscraft@demo.com / bassline@demo.com | Already confirmed for Corporate Day |
-| Vendor | pulsepro@demo.com | Sound vendor, use for the cancellation demo |
+| Vendor | royalbanquet@demo.com | Catering: pending competing request from Corporate Day |
+| Vendor | lenscraft@demo.com / bassline@demo.com | Photography / Sound: confirmed for Corporate Day |
+| Vendor | pulsepro@demo.com | Sound: use for cancellation and replacement demo |
+| Vendor | auroraflowers@demo.com | Decoration: luxury floral & fairy light setups |
+| Vendor | shutterstories@demo.com | Photography: 4K drone & candid storytelling |
 
-Other vendors (`@demo.com`): spiceroute, grandfeast, hometaste, petalpine, stagecraft, mysurumandap, framefocus, candid, sonicwaves.
+**Vendor Directory (33 vendors across 4 categories):**
+- **Catering (9)**: Spice Route, Grand Feast, Home Taste, Royal Banquet, Saffron & Spice, Coorg Delicacies, Green Garden Pure Veg, Urban Bites, Karavali Coastal.
+- **Decoration (8)**: Petal & Pine, Stagecraft Studio, Mysuru Mandap, Aurora Floral, Celestial Grand, EcoBloom, Heritage Karnataka, CyberNeon.
+- **Photography (8)**: LensCraft, Frame & Focus, Candid Collective, Shutter Stories, Pixel Palette, Prism Heritage, CinemaWave, Vivid Lens.
+- **Sound (8)**: BassLine Audio, Sonic Waves, PulsePro Sound, Resonance Acoustic, SubZero Bass Labs, Acoustic Craft, SoundKraft Live, EchoLite Portable.
 
 ---
 
