@@ -115,8 +115,8 @@
     if (bgShapesGroup) {
       bgShapesGroup.children.forEach(c => {
         if (c.material) {
-          c.material.color.setHex(isLight ? 0x4f46e5 : 0x6366f1);
-          c.material.opacity = isLight ? 0.08 : 0.15;
+          c.material.color.setHex(isLight ? 0x1d4ed8 : 0x2563eb);
+          c.material.opacity = isLight ? 0.08 : 0.16;
           c.material.needsUpdate = true;
         }
       });
@@ -179,30 +179,34 @@
       const ctx = c.getContext('2d');
       const grad = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
       grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
-      grad.addColorStop(0.35, 'rgba(129, 140, 248, 0.85)');
-      grad.addColorStop(0.75, 'rgba(99, 102, 241, 0.2)');
+      grad.addColorStop(0.35, 'rgba(56, 189, 248, 0.85)');
+      grad.addColorStop(0.75, 'rgba(37, 99, 235, 0.25)');
       grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, 32, 32);
       return new THREE.CanvasTexture(c);
     }
 
-    // Particle constellation
+    // Particle constellation in vibrant shades of blue
     const particleCount = 120;
     const geometry = new THREE.BufferGeometry();
     const positions = new Float32Array(particleCount * 3);
     const colors = new Float32Array(particleCount * 3);
 
-    const c1 = new THREE.Color(0x818cf8);
-    const c2 = new THREE.Color(0x38bdf8);
-    const c3 = new THREE.Color(0xc084fc);
+    const blueShades = [
+      new THREE.Color(0x2563eb), // Royal Blue
+      new THREE.Color(0x38bdf8), // Electric Sky Blue
+      new THREE.Color(0x06b6d4), // Cyan Blue
+      new THREE.Color(0x7dd3fc), // Ice Blue
+      new THREE.Color(0x1d4ed8)  // Cobalt Blue
+    ];
 
     for (let i = 0; i < particleCount; i++) {
       positions[i * 3] = (Math.random() - 0.5) * 80;
       positions[i * 3 + 1] = (Math.random() - 0.5) * 60;
       positions[i * 3 + 2] = (Math.random() - 0.5) * 35;
 
-      const chosen = Math.random() > 0.6 ? c1 : (Math.random() > 0.3 ? c2 : c3);
+      const chosen = blueShades[Math.floor(Math.random() * blueShades.length)];
       colors[i * 3] = chosen.r;
       colors[i * 3 + 1] = chosen.g;
       colors[i * 3 + 2] = chosen.b;
@@ -227,7 +231,7 @@
     // Floating subtle 3D wireframe constellation nodes
     bgShapesGroup = new THREE.Group();
     const wireGeom = new THREE.IcosahedronGeometry(2.0, 1);
-    const wireMat = new THREE.MeshBasicMaterial({ color: 0x6366f1, wireframe: true, transparent: true, opacity: 0.15 });
+    const wireMat = new THREE.MeshBasicMaterial({ color: 0x2563eb, wireframe: true, transparent: true, opacity: 0.16 });
 
     for (let i = 0; i < 3; i++) {
       const mesh = new THREE.Mesh(wireGeom, wireMat);
@@ -274,7 +278,8 @@
     animate();
   }
 
-  // Hero 3D interactive holographic scene in Login page
+  // Hero 3D interactive holographic scene in Login page:
+  // Replaced solar system with Futuristic 3D Event Coordination Lattice Matrix
   let authAnimId, authRenderer, authScene, authCamera;
   function initAuthHero3D() {
     const wrap = document.getElementById('auth-hero-canvas-wrap');
@@ -291,108 +296,220 @@
     const h = wrap.clientHeight || 280;
 
     authCamera = new THREE.PerspectiveCamera(45, w / h, 0.1, 100);
-    authCamera.position.z = 7.2;
+    authCamera.position.set(0, 0, 7.4);
 
     authRenderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
     authRenderer.setSize(w, h);
     authRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-    const coreGroup = new THREE.Group();
+    const matrixGroup = new THREE.Group();
 
-    // Outer wireframe glowing icosahedron
-    const outerGeom = new THREE.IcosahedronGeometry(1.85, 1);
-    const outerMat = new THREE.MeshBasicMaterial({
-      color: 0x818cf8,
+    // 1. Central Coordination Prism Core (Dual-Nested Octahedral & Crystal Hyper-Nexus)
+    const outerCoreGeom = new THREE.OctahedronGeometry(1.65, 0);
+    const outerCoreMat = new THREE.MeshBasicMaterial({
+      color: 0x38bdf8,
       wireframe: true,
       transparent: true,
-      opacity: 0.45
+      opacity: 0.65
     });
-    const outerMesh = new THREE.Mesh(outerGeom, outerMat);
-    coreGroup.add(outerMesh);
+    const outerCore = new THREE.Mesh(outerCoreGeom, outerCoreMat);
+    matrixGroup.add(outerCore);
 
-    // Inner glowing solid crystal
-    const innerGeom = new THREE.IcosahedronGeometry(1.3, 0);
-    const innerMat = new THREE.MeshStandardMaterial({
-      color: 0x4f46e5,
-      roughness: 0.25,
-      metalness: 0.8,
-      wireframe: false,
+    const innerCoreGeom = new THREE.DodecahedronGeometry(1.08, 0);
+    const innerCoreMat = new THREE.MeshStandardMaterial({
+      color: 0x1d4ed8,
+      emissive: 0x0284c7,
+      emissiveIntensity: 0.4,
+      roughness: 0.18,
+      metalness: 0.85,
       transparent: true,
-      opacity: 0.85
+      opacity: 0.92
     });
-    const innerMesh = new THREE.Mesh(innerGeom, innerMat);
-    coreGroup.add(innerMesh);
+    const innerCore = new THREE.Mesh(innerCoreGeom, innerCoreMat);
+    matrixGroup.add(innerCore);
 
-    // Orbiting Rings
-    const ring1Geom = new THREE.TorusGeometry(2.65, 0.035, 16, 100);
-    const ring1Mat = new THREE.MeshBasicMaterial({ color: 0x06b6d4, transparent: true, opacity: 0.8 });
-    const ring1 = new THREE.Mesh(ring1Geom, ring1Mat);
-    ring1.rotation.x = Math.PI / 3;
-    coreGroup.add(ring1);
+    // 2. 4 Floating Isometric Service Command Nodes (Catering, Decoration, Photography, Sound)
+    // Styled in diverse, harmonious shades of blue (Ice Blue, Sky Blue, Royal Blue, Cyan Blue)
+    const nodeDefs = [
+      { name: 'catering', color: 0x7dd3fc, glow: 0x38bdf8, base: [-2.3, 1.25, 0.4], phase: 0 },
+      { name: 'decoration', color: 0x38bdf8, glow: 0x0ea5e9, base: [2.3, 1.25, -0.4], phase: Math.PI * 0.5 },
+      { name: 'photography', color: 0x2563eb, glow: 0x1d4ed8, base: [2.1, -1.25, 0.5], phase: Math.PI },
+      { name: 'sound', color: 0x06b6d4, glow: 0x0891b2, base: [-2.1, -1.25, -0.5], phase: Math.PI * 1.5 }
+    ];
 
-    const ring2Geom = new THREE.TorusGeometry(3.05, 0.03, 16, 100);
-    const ring2Mat = new THREE.MeshBasicMaterial({ color: 0xa855f7, transparent: true, opacity: 0.7 });
-    const ring2 = new THREE.Mesh(ring2Geom, ring2Mat);
-    ring2.rotation.x = -Math.PI / 3.5;
-    ring2.rotation.y = Math.PI / 5;
-    coreGroup.add(ring2);
+    const nodes = [];
+    const nodeGeom = new THREE.BoxGeometry(0.52, 0.52, 0.52);
+    const nodeEdgeGeom = new THREE.BoxGeometry(0.58, 0.58, 0.58);
 
-    // 4 Orbiting Satellites representing the 4 services
-    const satGroup = new THREE.Group();
-    const satColors = [0x10b981, 0xf59e0b, 0x06b6d4, 0xf43f5e];
-    const sats = [];
-    for (let i = 0; i < 4; i++) {
-      const sGeom = new THREE.SphereGeometry(0.18, 16, 16);
-      const sMat = new THREE.MeshStandardMaterial({
-        color: satColors[i],
-        emissive: satColors[i],
-        emissiveIntensity: 0.6,
-        roughness: 0.2
+    nodeDefs.forEach(def => {
+      const g = new THREE.Group();
+      g.position.set(def.base[0], def.base[1], def.base[2]);
+
+      const nMat = new THREE.MeshStandardMaterial({
+        color: def.color,
+        emissive: def.glow,
+        emissiveIntensity: 0.5,
+        roughness: 0.2,
+        metalness: 0.8,
+        transparent: true,
+        opacity: 0.9
       });
-      const sMesh = new THREE.Mesh(sGeom, sMat);
-      satGroup.add(sMesh);
-      sats.push({ mesh: sMesh, angle: (i * Math.PI) / 2, radius: 2.7, speed: 0.016 + i * 0.004 });
+      const box = new THREE.Mesh(nodeGeom, nMat);
+      g.add(box);
+
+      const edgeMat = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.4
+      });
+      const edge = new THREE.Mesh(nodeEdgeGeom, edgeMat);
+      g.add(edge);
+
+      matrixGroup.add(g);
+      nodes.push({ group: g, base: def.base, phase: def.phase, mesh: box });
+    });
+
+    // 3. Dynamic Laser Sync Lines connecting Core to Nodes and Nodes in a Diamond Loop
+    const lineSegCount = 8;
+    const linePositions = new Float32Array(lineSegCount * 2 * 3);
+    const lineGeom = new THREE.BufferGeometry();
+    lineGeom.setAttribute('position', new THREE.BufferAttribute(linePositions, 3));
+
+    const laserMat = new THREE.LineBasicMaterial({
+      color: 0x38bdf8,
+      transparent: true,
+      opacity: 0.6,
+      blending: THREE.AdditiveBlending
+    });
+    const laserMesh = new THREE.LineSegments(lineGeom, laserMat);
+    matrixGroup.add(laserMesh);
+
+    // 4. Rotating Telemetry Radar Disk at the base
+    const radarGeom = new THREE.RingGeometry(2.5, 2.54, 48);
+    const radarMat = new THREE.MeshBasicMaterial({
+      color: 0x0ea5e9,
+      transparent: true,
+      opacity: 0.35,
+      side: THREE.DoubleSide
+    });
+    const radarDisk = new THREE.Mesh(radarGeom, radarMat);
+    radarDisk.position.y = -2.35;
+    radarDisk.rotation.x = Math.PI / 2.2;
+    matrixGroup.add(radarDisk);
+
+    const innerRadarGeom = new THREE.RingGeometry(1.6, 1.63, 36);
+    const innerRadarDisk = new THREE.Mesh(innerRadarGeom, radarMat);
+    innerRadarDisk.position.y = -2.35;
+    innerRadarDisk.rotation.x = Math.PI / 2.2;
+    matrixGroup.add(innerRadarDisk);
+
+    // 5. Drifting Telemetry Blue Data Sparks
+    const sparkCount = 40;
+    const sparkGeom = new THREE.BufferGeometry();
+    const sparkPos = new Float32Array(sparkCount * 3);
+    const sparkVel = [];
+    for (let i = 0; i < sparkCount; i++) {
+      sparkPos[i * 3] = (Math.random() - 0.5) * 6;
+      sparkPos[i * 3 + 1] = (Math.random() - 0.5) * 4;
+      sparkPos[i * 3 + 2] = (Math.random() - 0.5) * 3;
+      sparkVel.push(0.008 + Math.random() * 0.012);
     }
-    coreGroup.add(satGroup);
+    sparkGeom.setAttribute('position', new THREE.BufferAttribute(sparkPos, 3));
+    const sparkMat = new THREE.PointsMaterial({
+      color: 0x7dd3fc,
+      size: 0.08,
+      transparent: true,
+      opacity: 0.75,
+      blending: THREE.AdditiveBlending
+    });
+    const sparks = new THREE.Points(sparkGeom, sparkMat);
+    matrixGroup.add(sparks);
 
-    // Lighting
-    const amb = new THREE.AmbientLight(0xffffff, 0.85);
+    // Lighting (Luminous Blue Highlights)
+    const amb = new THREE.AmbientLight(0xdbeafe, 0.85);
     authScene.add(amb);
-    const d1 = new THREE.DirectionalLight(0x818cf8, 2.5);
-    d1.position.set(5, 5, 5);
+    const d1 = new THREE.DirectionalLight(0x38bdf8, 2.6);
+    d1.position.set(5, 6, 5);
     authScene.add(d1);
-    const d2 = new THREE.DirectionalLight(0x06b6d4, 1.8);
-    d2.position.set(-5, -3, 3);
+    const d2 = new THREE.DirectionalLight(0x1d4ed8, 2.2);
+    d2.position.set(-5, -4, 4);
     authScene.add(d2);
+    const d3 = new THREE.DirectionalLight(0x06b6d4, 1.5);
+    d3.position.set(0, 5, -4);
+    authScene.add(d3);
 
-    authScene.add(coreGroup);
+    authScene.add(matrixGroup);
 
     let targetRotX = 0, targetRotY = 0;
     const onMove = (e) => {
       const rect = wrap.getBoundingClientRect();
       const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
       const y = -(((e.clientY - rect.top) / rect.height) * 2 - 1);
-      targetRotY = x * 0.7;
-      targetRotX = -y * 0.7;
+      targetRotY = x * 0.65;
+      targetRotX = -y * 0.65;
     };
     wrap.addEventListener('mousemove', onMove);
 
+    let clock = 0;
     function loop() {
       authAnimId = requestAnimationFrame(loop);
-      coreGroup.rotation.y += 0.005;
-      coreGroup.rotation.x += 0.0025;
-      ring1.rotation.z += 0.008;
-      ring2.rotation.z -= 0.006;
+      clock += 0.016;
 
-      coreGroup.rotation.y += (targetRotY - coreGroup.rotation.y) * 0.06;
-      coreGroup.rotation.x += (targetRotX - coreGroup.rotation.x) * 0.06;
+      // Rotate and pulse the Core Prism
+      outerCore.rotation.y += 0.008;
+      outerCore.rotation.x += 0.004;
+      innerCore.rotation.y -= 0.006;
+      innerCore.rotation.z += 0.005;
 
-      sats.forEach(s => {
-        s.angle += s.speed;
-        s.mesh.position.x = Math.cos(s.angle) * s.radius;
-        s.mesh.position.y = Math.sin(s.angle) * (s.radius * 0.45);
-        s.mesh.position.z = Math.sin(s.angle * 1.5) * 0.9;
+      const pulse = 1 + Math.sin(clock * 2.4) * 0.035;
+      innerCore.scale.set(pulse, pulse, pulse);
+
+      // Rotate radar discs
+      radarDisk.rotation.z += 0.003;
+      innerRadarDisk.rotation.z -= 0.004;
+
+      // Parallax damping
+      matrixGroup.rotation.y += (targetRotY - matrixGroup.rotation.y) * 0.06;
+      matrixGroup.rotation.x += (targetRotX - matrixGroup.rotation.x) * 0.06;
+
+      // Animate Nodes floating & update laser line positions
+      const posArr = lineGeom.attributes.position.array;
+      let ptr = 0;
+
+      nodes.forEach((n, idx) => {
+        n.group.position.y = n.base[1] + Math.sin(clock * 1.8 + n.phase) * 0.18;
+        n.group.rotation.x += 0.012;
+        n.group.rotation.y += 0.016;
+
+        // Center to Node laser beam
+        posArr[ptr++] = 0; posArr[ptr++] = 0; posArr[ptr++] = 0;
+        posArr[ptr++] = n.group.position.x;
+        posArr[ptr++] = n.group.position.y;
+        posArr[ptr++] = n.group.position.z;
+
+        // Node to adjacent Node perimeter laser beam
+        const nextNode = nodes[(idx + 1) % nodes.length];
+        posArr[ptr++] = n.group.position.x;
+        posArr[ptr++] = n.group.position.y;
+        posArr[ptr++] = n.group.position.z;
+        posArr[ptr++] = nextNode.group.position.x;
+        posArr[ptr++] = nextNode.group.position.y;
+        posArr[ptr++] = nextNode.group.position.z;
       });
+
+      lineGeom.attributes.position.needsUpdate = true;
+      laserMat.opacity = 0.38 + Math.sin(clock * 3.2) * 0.22;
+
+      // Animate drifting telemetry sparks
+      const spArr = sparkGeom.attributes.position.array;
+      for (let i = 0; i < sparkCount; i++) {
+        spArr[i * 3 + 1] += sparkVel[i];
+        if (spArr[i * 3 + 1] > 2.8) {
+          spArr[i * 3 + 1] = -2.4;
+        }
+      }
+      sparkGeom.attributes.position.needsUpdate = true;
 
       authRenderer.render(authScene, authCamera);
     }
@@ -465,14 +582,14 @@
       <section class="auth-hero">
         <div>
           <a class="brand" href="#" style="font-size:24px">
-            <svg class="brand-mark" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2.4" stroke-linecap="round"><path d="M4 8h12M12 4l4 4-4 4M20 16H8M12 12l-4 4 4 4"/></svg>
+            <svg class="brand-mark" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.4" stroke-linecap="round"><path d="M4 8h12M12 4l4 4-4 4M20 16H8M12 12l-4 4 4 4"/></svg>
             <span>EventSync</span>
           </a>
-          <h1>Every vendor. One event.<br><span style="background:linear-gradient(135deg,#818cf8,#38bdf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent">Perfectly Coordinated.</span></h1>
+          <h1>Every vendor. One event.<br><span style="background:linear-gradient(135deg,#60a5fa,#38bdf8,#0ea5e9);-webkit-background-clip:text;-webkit-text-fill-color:transparent">Perfectly Coordinated.</span></h1>
           <p class="hero-desc">Describe your event once. EventSync seamlessly matches verified vendors free on your date, capable of handling your guest count and city, with live state synchronization.</p>
         </div>
 
-        <div class="auth-hero-3d-box" id="auth-hero-canvas-wrap" title="Interactive 3D Event Core - Hover to interact"></div>
+        <div class="auth-hero-3d-box" id="auth-hero-canvas-wrap" title="Interactive 3D Event Coordination Lattice - Hover to interact"></div>
 
         <div>
           <div class="sync-demo" aria-hidden="true">
@@ -603,7 +720,7 @@
     <header class="topbar">
       <div class="topbar-inner">
         <a class="brand" href="#">
-          <svg class="brand-mark" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2.4" stroke-linecap="round"><path d="M4 8h12M12 4l4 4-4 4M20 16H8M12 12l-4 4 4 4"/></svg>
+          <svg class="brand-mark" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.4" stroke-linecap="round"><path d="M4 8h12M12 4l4 4-4 4M20 16H8M12 12l-4 4 4 4"/></svg>
           <span>EventSync</span>
         </a>
         <nav class="nav" aria-label="Main">
@@ -688,7 +805,7 @@
           </div>
         </div>
         <div class="stat-card">
-          <div class="stat-icon" style="background:rgba(16,185,129,0.15);border-color:rgba(16,185,129,0.3)">✨</div>
+          <div class="stat-icon" style="background:rgba(14,165,233,0.16);border-color:rgba(56,189,248,0.4)">✨</div>
           <div>
             <div class="stat-num">${totalConfirmedServices}</div>
             <div class="stat-lbl">Services Confirmed</div>
@@ -737,7 +854,7 @@
                   ${s.services.map(x => `<span class="badge ${x.status}" title="${cap(x.category)}: ${STATUS_LABEL[x.status]}">${ICON[x.category]} ${cap(x.category)}: ${STATUS_LABEL[x.status]}</span>`).join('')}
                 </div>
                 <div style="margin-top:16px;display:flex;justify-content:flex-end">
-                  <a class="btn small" href="#/events/${e.id}" style="color:#c7d2fe;background:rgba(99,102,241,0.15);border-color:rgba(99,102,241,0.3)">Manage Event & Vendors →</a>
+                  <a class="btn small" href="#/events/${e.id}" style="color:#93c5fd;background:rgba(37,99,235,0.16);border-color:rgba(56,189,248,0.4)">Manage Event & Vendors →</a>
                 </div>
               </article>`;
           }).join('')}
@@ -831,7 +948,7 @@
 
       <div class="hero-stats-banner" style="margin-bottom:20px">
         <div class="stat-card">
-          <div class="stat-icon" style="background:rgba(99,102,241,0.15);border-color:rgba(99,102,241,0.3)">💎</div>
+          <div class="stat-icon" style="background:rgba(37,99,235,0.16);border-color:rgba(56,189,248,0.4)">💎</div>
           <div>
             <div class="stat-num">${inr(e.budget)}</div>
             <div class="stat-lbl">Allocated Budget</div>
@@ -845,7 +962,7 @@
           </div>
         </div>
         <div class="stat-card">
-          <div class="stat-icon" style="background:rgba(16,185,129,0.15);border-color:rgba(16,185,129,0.3)">✨</div>
+          <div class="stat-icon" style="background:rgba(14,165,233,0.16);border-color:rgba(56,189,248,0.4)">✨</div>
           <div>
             <div class="stat-num">${s.confirmed} / ${s.total}</div>
             <div class="stat-lbl">Services Confirmed</div>
@@ -1006,14 +1123,14 @@
           </div>
         </div>
         <div class="stat-card">
-          <div class="stat-icon" style="background:rgba(16,185,129,0.15);border-color:rgba(16,185,129,0.3)">📅</div>
+          <div class="stat-icon" style="background:rgba(14,165,233,0.16);border-color:rgba(56,189,248,0.4)">📅</div>
           <div>
             <div class="stat-num">${acceptedCount}</div>
             <div class="stat-lbl">Confirmed Bookings</div>
           </div>
         </div>
         <div class="stat-card">
-          <div class="stat-icon" style="background:rgba(99,102,241,0.15);border-color:rgba(99,102,241,0.3)">⚡</div>
+          <div class="stat-icon" style="background:rgba(37,99,235,0.16);border-color:rgba(56,189,248,0.4)">⚡</div>
           <div>
             <div class="stat-num">${vendor.max_concurrent}</div>
             <div class="stat-lbl">Concurrent Capacity</div>
@@ -1083,14 +1200,14 @@
 
       <div class="hero-stats-banner">
         <div class="stat-card">
-          <div class="stat-icon" style="background:rgba(16,185,129,0.15);border-color:rgba(16,185,129,0.3)">📅</div>
+          <div class="stat-icon" style="background:rgba(14,165,233,0.16);border-color:rgba(56,189,248,0.4)">📅</div>
           <div>
             <div class="stat-num">${acc.length}</div>
             <div class="stat-lbl">Confirmed Bookings</div>
           </div>
         </div>
         <div class="stat-card">
-          <div class="stat-icon" style="background:rgba(99,102,241,0.15);border-color:rgba(99,102,241,0.3)">💎</div>
+          <div class="stat-icon" style="background:rgba(37,99,235,0.16);border-color:rgba(56,189,248,0.4)">💎</div>
           <div>
             <div class="stat-num">${inr(totalRev)}</div>
             <div class="stat-lbl">Confirmed Revenue</div>
