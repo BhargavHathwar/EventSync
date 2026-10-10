@@ -36,6 +36,12 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^\d{2}:\d{2}$/;
 const today = () => new Date().toISOString().slice(0, 10);
 
+// Registration validation rules (enforced on the server; the browser mirrors them for convenience)
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const NAME_RE = /^[A-Za-z][A-Za-z .'-]{1,59}$/;
+// At least 8 characters, with at least one letter and one number
+const PASSWORD_RE = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
+
 function parseEvent(b, { requireFuture }) {
   const f = {
     name: String(b.name || '').trim(), date: String(b.date || ''), start_time: String(b.start_time || ''),
@@ -72,16 +78,24 @@ function parseVendorProfile(v) {
 
 // ---------------- auth ----------------
 app.post('/api/auth/register', h(async (req, res) => {
-  const { name, email, password, role } = req.body;
-  if (!name || !email || !password) throw new HttpError(400, 'Name, email and password are required');
-  if (String(password).length < 6) throw new HttpError(400, 'Password must be at least 6 characters');
-  if (!['organizer', 'vendor'].includes(role)) throw new HttpError(400, 'Choose organizer or vendor');
-  if (await db.prepare('SELECT 1 FROM users WHERE email = ?').get(email.toLowerCase())) throw new HttpError(409, 'An account with this email already exists');
+  const { name, email, password, confirmPassword, role } = req.body;
 
-  const profile = role === 'vendor' ? parseVendorProfile({ ...req.body.vendor, name: req.body.vendor?.name || name }) : null;
+  if (!name || !email || !password || !confirmPassword) throw new HttpError(400, 'All fields are required');
+
+  const cleanName = String(name).trim();
+  const cleanEmail = String(email).trim().toLowerCase();
+
+  if (!NAME_RE.test(cleanName)) throw new HttpError(400, 'Name must start with a letter and use only letters, spaces, dots, apostrophes or hyphens');
+  if (!EMAIL_RE.test(cleanEmail)) throw new HttpError(400, 'Enter a valid email address, such as name@example.com');
+  if (!PASSWORD_RE.test(String(password))) throw new HttpError(400, 'Password must be at least 8 characters and include a letter and a number');
+  if (password !== confirmPassword) throw new HttpError(400, 'Passwords do not match');
+  if (!['organizer', 'vendor'].includes(role)) throw new HttpError(400, 'Choose organizer or vendor');
+  if (await db.prepare('SELECT 1 FROM users WHERE email = ?').get(cleanEmail)) throw new HttpError(409, 'An account with this email already exists');
+
+  const profile = role === 'vendor' ? parseVendorProfile({ ...req.body.vendor, name: req.body.vendor?.name || cleanName }) : null;
   const uid = await db.transaction(async () => {
     const uRes = await db.prepare('INSERT INTO users (name,email,password_hash,role) VALUES (?,?,?,?)')
-      .run(name.trim(), email.toLowerCase(), hashPassword(password), role);
+      .run(cleanName, cleanEmail, hashPassword(password), role);
     const newUid = uRes.lastInsertRowid;
     if (profile) {
       await db.prepare(`INSERT INTO vendors (user_id,name,category,description,package,service_areas,max_guests,max_concurrent,price,price_unit)
@@ -91,7 +105,7 @@ app.post('/api/auth/register', h(async (req, res) => {
     return newUid;
   })();
   const token = await createSession(uid);
-  res.json({ token, user: { id: uid, name, email: email.toLowerCase(), role } });
+  res.json({ token, user: { id: uid, name: cleanName, email: cleanEmail, role } });
 }));
 
 app.post('/api/auth/login', h(async (req, res) => {

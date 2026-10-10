@@ -3,6 +3,12 @@
   const ICON = { catering: '🍽️', decoration: '🎨', photography: '📷', sound: '🔊' };
   const CATS = ['catering', 'decoration', 'photography', 'sound'];
   const UNIT = { flat: 'flat', per_guest: 'per guest', per_hour: 'per hour' };
+
+  // Registration rules. These mirror the server rules in server.js.
+  const NAME_RE = /^[A-Za-z][A-Za-z .'-]{1,59}$/;
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+  const PASSWORD_RE = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
+
   const state = {
     token: localStorage.getItem('es_token'),
     user: null,
@@ -28,6 +34,17 @@
     declined: 'Declined', cancelled: 'Cancelled', withdrawn: 'Withdrawn'
   };
   const badge = s => `<span class="badge ${s}">${STATUS_LABEL[s] || s}</span>`;
+
+  // Returns the first problem with the registration fields, or null if all are valid.
+  function validateRegister({ uname = '', email = '', password = '', confirmPassword = '' }) {
+    const name = uname.trim();
+    if (!name) return 'Full name is required';
+    if (!NAME_RE.test(name)) return 'Name must start with a letter and use only letters, spaces, dots, apostrophes or hyphens';
+    if (!EMAIL_RE.test(email.trim())) return 'Enter a valid email address, such as name@example.com';
+    if (!PASSWORD_RE.test(password)) return 'Password must be at least 8 characters and include a letter and a number';
+    if (password !== confirmPassword) return 'Passwords do not match';
+    return null;
+  }
 
   async function api(path, method = 'GET', body) {
     const res = await fetch('/api' + path, {
@@ -411,7 +428,7 @@
             </div>
           </div>
 
-          <form data-form="${reg ? 'register' : 'login'}" class="stack">
+          <form data-form="${reg ? 'register' : 'login'}" class="stack" ${reg ? 'novalidate' : ''}>
             ${reg ? `
               <div class="role-selector-3d" role="group" aria-label="Account type">
                 <button type="button" data-act="role" data-role="organizer" class="role-btn ${state.authRole === 'organizer' ? 'on' : ''}">
@@ -437,8 +454,16 @@
 
             <div class="field">
               <label for="a-pw">Password</label>
-              <input id="a-pw" type="password" name="password" minlength="6" placeholder="••••••••" required>
+              <input id="a-pw" type="password" name="password" placeholder="••••••••" required>
+              ${reg ? '<div class="hint">At least 8 characters, with a letter and a number.</div>' : ''}
             </div>
+
+            ${reg ? `
+              <div class="field">
+                <label for="a-cpw">Confirm password</label>
+                <input id="a-cpw" type="password" name="confirmPassword" placeholder="••••••••" required>
+              </div>
+              <p id="a-err" role="alert" style="display:none;color:#f87171;font-size:14px;margin:0"></p>` : ''}
 
             ${reg && state.authRole === 'vendor' ? `
               <fieldset>
@@ -1268,9 +1293,24 @@
         startSession(await api('/auth/login', 'POST', { email: d.email, password: d.password }));
       }
       else if (kind === 'register') {
-        const body = { name: d.uname, email: d.email, password: d.password, role: state.authRole };
+        // Check the rules in the browser first so the user sees the problem immediately.
+        const errorEl = f.querySelector('#a-err');
+        const problem = validateRegister(d);
+        if (errorEl) {
+          errorEl.textContent = problem || '';
+          errorEl.style.display = problem ? 'block' : 'none';
+        }
+        if (problem) return;
+
+        const body = {
+          name: d.uname,
+          email: d.email,
+          password: d.password,
+          confirmPassword: d.confirmPassword,
+          role: state.authRole
+        };
         if (state.authRole === 'vendor') {
-          const { uname, email, password, ...vendor } = d;
+          const { uname, email, password, confirmPassword, ...vendor } = d;
           body.vendor = vendor;
         }
         startSession(await api('/auth/register', 'POST', body));
