@@ -1,0 +1,20 @@
+{
+  "name": "eventsync",
+  "version": "1.0.0",
+  "description": "EventSync - Local Event Vendor Coordination (THE LAST COMMIT)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test test/api.test.js",
+    "reset": "node seed.js --reset"
+  },
+  "license": "ISC",
+  "dependencies": {
+    "better-sqlite3": "^13.0.3",
+    "express": "^5.3.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

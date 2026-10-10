@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Local database (created automatically on first run)
+data/*.db
+data/*.db-shm
+data/*.db-wal
+
+# Environment and secrets (in case you add them later)
+.env
+.env.*
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Build and test output
+dist/
+coverage/
