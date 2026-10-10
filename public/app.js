@@ -582,33 +582,70 @@
       <section class="auth-hero">
         <div>
           <a class="brand" href="#" style="font-size:24px">
-            <svg class="brand-mark" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.4" stroke-linecap="round"><path d="M4 8h12M12 4l4 4-4 4M20 16H8M12 12l-4 4 4 4"/></svg>
+            <span class="brand-logo-badge">ES</span>
             <span>EventSync</span>
           </a>
-          <h1>Every vendor. One event.<br><span style="background:linear-gradient(135deg,#60a5fa,#38bdf8,#0ea5e9);-webkit-background-clip:text;-webkit-text-fill-color:transparent">Perfectly Coordinated.</span></h1>
+          <div class="auth-pill"><span class="pulse-dot"></span> Next-Gen Event Coordination Engine</div>
+          <h1>Every vendor. One event.<br><span class="hero-highlight">Perfectly Coordinated.</span></h1>
           <p class="hero-desc">Describe your event once. EventSync seamlessly matches verified vendors free on your date, capable of handling your guest count and city, with live state synchronization.</p>
         </div>
 
-        <div class="auth-hero-3d-box" id="auth-hero-canvas-wrap" title="Interactive 3D Event Coordination Lattice - Hover to interact"></div>
+        <div class="auth-hero-3d-box" id="auth-hero-canvas-wrap" title="Interactive 3D Event Coordination Lattice - Hover to interact">
+          <div class="hud-tag"><span class="hud-pulse"></span> 3D Coordination Lattice · Live</div>
+          <div class="hud-corner top-left"></div>
+          <div class="hud-corner top-right"></div>
+          <div class="hud-corner bottom-left"></div>
+          <div class="hud-corner bottom-right"></div>
+        </div>
 
         <div>
           <div class="sync-demo" aria-hidden="true">
-            <div><span>🍽️ Catering</span><span class="badge confirmed">Confirmed · Ready</span></div>
-            <div><span>🎨 Decoration</span><span class="badge pending">Matching · In Progress</span></div>
-            <div><span>🔊 Sound</span><span class="badge attention">Auto-Resolving · Replacement</span></div>
+            <div class="sync-demo-item">
+              <div class="sync-demo-left">
+                <span class="sync-demo-icon">🍽️</span>
+                <div>
+                  <div class="sync-demo-name">Catering</div>
+                  <div class="sync-demo-sub">300 Guests · Multi-Course</div>
+                </div>
+              </div>
+              <span class="badge confirmed">Confirmed · Ready</span>
+            </div>
+            <div class="sync-demo-item">
+              <div class="sync-demo-left">
+                <span class="sync-demo-icon">🎨</span>
+                <div>
+                  <div class="sync-demo-name">Decoration</div>
+                  <div class="sync-demo-sub">Theme: Sapphire Prism</div>
+                </div>
+              </div>
+              <span class="badge pending">Matching · In Progress</span>
+            </div>
+            <div class="sync-demo-item">
+              <div class="sync-demo-left">
+                <span class="sync-demo-icon">🔊</span>
+                <div>
+                  <div class="sync-demo-name">Sound & Audio</div>
+                  <div class="sync-demo-sub">Conflict Self-Healing</div>
+                </div>
+              </div>
+              <span class="badge attention">Auto-Resolving · Replacement</span>
+            </div>
           </div>
-          <p class="small muted" style="margin-top:24px">THE LAST COMMIT · High-Precision Local Event Vendor Coordination</p>
+          <div class="auth-trust-bar">
+            <span>🛡️ Conflict-Free Guarantee</span>
+            <span>⚡ Real-Time Availability Sync</span>
+          </div>
         </div>
       </section>
 
       <section class="auth-form-wrap">
         <div class="auth-form-card">
-          <div class="row between" style="margin-bottom:16px">
+          <div class="row between" style="margin-bottom:18px;align-items:center">
             <div>
-              <h2>${reg ? 'Create Account' : 'Welcome Back'}</h2>
-              <p class="subtitle">${reg ? 'Join as an organizer or local vendor' : 'Sign in to manage and sync your events'}</p>
+              <h2 style="font-size:26px;letter-spacing:-0.03em">${reg ? 'Create Account' : 'Welcome Back'}</h2>
+              <p class="subtitle" style="margin-top:4px">${reg ? 'Join as an organizer or local vendor' : 'Sign in to manage and coordinate your events'}</p>
             </div>
-            <div class="seg" role="group" aria-label="Auth Mode">
+            <div class="seg auth-seg" role="group" aria-label="Auth Mode">
               <button type="button" data-act="authmode" class="${!reg ? 'on' : ''}">Sign In</button>
               <button type="button" data-act="authmode" class="${reg ? 'on' : ''}">Register</button>
             </div>
@@ -619,13 +656,17 @@
               <div class="role-selector-3d" role="group" aria-label="Account type">
                 <button type="button" data-act="role" data-role="organizer" class="role-btn ${state.authRole === 'organizer' ? 'on' : ''}">
                   <span class="role-icon">🎯</span>
-                  <span class="role-title">Organizer</span>
-                  <div class="role-desc">Plan events & book verified vendors</div>
+                  <div class="role-info">
+                    <span class="role-title">Organizer</span>
+                    <div class="role-desc">Plan events & coordinate vendors</div>
+                  </div>
                 </button>
                 <button type="button" data-act="role" data-role="vendor" class="role-btn ${state.authRole === 'vendor' ? 'on' : ''}">
                   <span class="role-icon">🎪</span>
-                  <span class="role-title">Vendor</span>
-                  <div class="role-desc">Get booked & manage schedule</div>
+                  <div class="role-info">
+                    <span class="role-title">Vendor</span>
+                    <div class="role-desc">Get booked & manage schedule</div>
+                  </div>
                 </button>
               </div>
               <div class="field">
@@ -657,7 +698,7 @@
                 ${vendorFields({ max_concurrent: 1, price_unit: 'flat' })}
               </fieldset>` : ''}
 
-            <button class="btn primary" type="submit" style="width:100%;padding:12px;margin-top:6px;font-size:15px">
+            <button class="btn primary glow-btn" type="submit" style="width:100%;padding:13px;margin-top:8px;font-size:15px;font-weight:700">
               ${reg ? 'Create My Account' : 'Sign In to EventSync'}
             </button>
           </form>
@@ -671,7 +712,7 @@
 
           <div class="demo-box">
             <header>
-              <span class="small" style="font-weight:700">⚡ 1-Click Demo Logins</span>
+              <span class="small" style="font-weight:700">⚡ 1-Click Demo Sandbox</span>
               <span class="tiny muted">password: demo123</span>
             </header>
             <div class="demo-grid">
@@ -720,7 +761,7 @@
     <header class="topbar">
       <div class="topbar-inner">
         <a class="brand" href="#">
-          <svg class="brand-mark" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.4" stroke-linecap="round"><path d="M4 8h12M12 4l4 4-4 4M20 16H8M12 12l-4 4 4 4"/></svg>
+          <span class="brand-logo-badge">ES</span>
           <span>EventSync</span>
         </a>
         <nav class="nav" aria-label="Main">
@@ -853,7 +894,8 @@
                 <div class="row" style="margin-top:14px;gap:8px">
                   ${s.services.map(x => `<span class="badge ${x.status}" title="${cap(x.category)}: ${STATUS_LABEL[x.status]}">${ICON[x.category]} ${cap(x.category)}: ${STATUS_LABEL[x.status]}</span>`).join('')}
                 </div>
-                <div style="margin-top:16px;display:flex;justify-content:flex-end">
+                <div style="margin-top:16px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+                  <button class="btn danger small" data-act="cancelevent" data-id="${e.id}" data-name="${esc(e.name)}">🗑️ Cancel event</button>
                   <a class="btn small" href="#/events/${e.id}" style="color:#93c5fd;background:rgba(37,99,235,0.16);border-color:rgba(56,189,248,0.4)">Manage Event & Vendors →</a>
                 </div>
               </article>`;
@@ -938,7 +980,10 @@
             <span>Quoted so far <b>${inr(committed)}</b></span>
           </div>
         </div>
-        <button class="btn" data-act="editevent" data-event='${esc(JSON.stringify(e))}'>✏️ Edit event</button>
+        <div class="row" style="gap:10px;align-items:center">
+          <button class="btn" data-act="editevent" data-event='${esc(JSON.stringify(e))}'>✏️ Edit event</button>
+          <button class="btn danger" data-act="cancelevent" data-id="${e.id}" data-name="${esc(e.name)}">🗑️ Cancel event</button>
+        </div>
       </div>
 
       <div class="banner ${s.overall}" role="status">
@@ -1014,7 +1059,10 @@
             <h3>${cap(x.category)}</h3>
             ${badge(x.status)}
           </div>
-          <p class="small muted" style="margin-top:6px">${x.budget ? 'Service budget limit ' + inr(x.budget) : 'No budget limit set'}</p>
+          <div class="row" style="margin-top:6px;gap:8px;align-items:center;flex-wrap:wrap">
+            <p class="small muted" style="margin:0">${x.budget ? 'Service budget limit ' + inr(x.budget) : 'No budget limit set'}</p>
+            <button class="btn tiny outline" data-act="changesvcbudget" data-id="${x.id}" data-category="${x.category}" data-budget="${x.budget ?? ''}" style="padding:2px 8px;font-size:12px;border-radius:6px;line-height:1.4">✏️ Change budget</button>
+          </div>
         </div>
         <div class="row">${actions}</div>
       </div>
@@ -1059,7 +1107,11 @@
       <div class="modal-head">
         <div>
           <h2 style="text-transform:capitalize">${ICON[service.category]} ${service.category} vendors</h2>
-          <p class="small muted" style="margin-top:6px">${fmtDate(event.date)} · ${event.start_time}–${event.end_time} · ${esc(event.city)} · ${event.attendees} guests${service.budget ? ' · budget ' + inr(service.budget) : ''}</p>
+          <div class="row" style="align-items:center;gap:10px;margin-top:6px;flex-wrap:wrap">
+            <span class="small muted">${fmtDate(event.date)} · ${event.start_time}–${event.end_time} · ${esc(event.city)} · ${event.attendees} guests</span>
+            <span class="small" style="font-weight:600">· Budget: ${service.budget ? inr(service.budget) : 'No limit'}</span>
+            <button class="btn tiny outline" data-act="changesvcbudget" data-id="${service.id}" data-category="${service.category}" data-budget="${service.budget ?? ''}" style="padding:2px 8px;font-size:12px;border-radius:6px;line-height:1.4">✏️ Change budget</button>
+          </div>
         </div>
         <button class="xbtn" data-act="closemodal" aria-label="Close">×</button>
       </div>
@@ -1089,13 +1141,33 @@
           </div>`).join('')
         : `<div class="empty"><h3>No vendor meets every requirement</h3><p class="muted">See why each vendor was excluded below. You can adjust the budget, date or city and search again.</p></div>`}
         ${excluded.length ? `
-          <details style="margin-top:18px">
-            <summary style="cursor:pointer;font-weight:600;color:var(--text-secondary)">${excluded.length} vendor${excluded.length > 1 ? 's' : ''} not available for this event</summary>
-            ${excluded.map(m => `
-              <div class="card" style="margin-top:8px">
-                <b>${esc(m.name)}</b>
-                <ul class="reasons bad">${m.reasons.map(r => `<li>${esc(r)}</li>`).join('')}</ul>
-              </div>`).join('')}
+          <details style="margin-top:18px" open>
+            <summary style="cursor:pointer;font-weight:600;color:var(--text-secondary);margin-bottom:8px">${excluded.length} vendor${excluded.length > 1 ? 's' : ''} not currently qualified for this event</summary>
+            ${excluded.map(m => {
+              const budgetIssue = m.reasons.some(r => /exceeds service budget/i.test(r));
+              return `
+              <div class="card" style="margin-top:8px;border-left:${budgetIssue ? '3px solid #38bdf8' : '1px solid var(--line)'}">
+                <div class="row between" style="align-items:flex-start;gap:12px">
+                  <div style="flex:1">
+                    <div style="display:flex;align-items:center;gap:8px">
+                      <b>${esc(m.name)}</b>
+                      <span class="stars">★ ${m.rating.toFixed(1)}</span>
+                    </div>
+                    ${m.package ? `<p class="tiny muted" style="margin-top:3px">${esc(m.package)}</p>` : ''}
+                    <ul class="reasons bad" style="margin-top:6px">${m.reasons.map(r => `<li>${esc(r)}</li>`).join('')}</ul>
+                  </div>
+                  <div style="text-align:right;flex-shrink:0">
+                    <div class="price" style="font-size:16px">${inr(m.quote)}</div>
+                    <p class="tiny muted">${inr(m.price)} ${UNIT[m.price_unit]}</p>
+                    ${budgetIssue ? `
+                      <button class="btn primary tiny glow-btn" data-act="quickbudgetmatch" data-service="${service.id}" data-vendor="${m.vendor_id}" data-quote="${m.quote}" data-name="${esc(m.name)}" style="margin-top:8px;white-space:nowrap">
+                        ⚡ Adjust budget to ${inr(m.quote)} & request
+                      </button>
+                    ` : ''}
+                  </div>
+                </div>
+              </div>`;
+            }).join('')}
           </details>` : ''}
       </div>`);
   }
@@ -1472,6 +1544,86 @@
             </form>
           </div>`, true);
       }
+      else if (act === 'cancelevent') {
+        const id = t.dataset.id;
+        const name = t.dataset.name || 'this event';
+        openModal(`
+          <div class="modal-head">
+            <h2>Cancel Event</h2>
+            <button class="xbtn" data-act="closemodal" aria-label="Close">×</button>
+          </div>
+          <div class="modal-body">
+            <p style="font-size:15px;line-height:1.6">Are you sure you want to cancel <b>${esc(name)}</b>?</p>
+            <div class="banner at_risk" style="margin:16px 0">
+              <span>⚠️</span>
+              <span>All active and confirmed vendor bookings for this event will be immediately cancelled, and booked vendors will be notified.</span>
+            </div>
+            <div class="row end" style="gap:10px;margin-top:20px">
+              <button class="btn" data-act="closemodal">Keep Event</button>
+              <button class="btn danger" data-act="confirmcancelevent" data-id="${id}">Yes, Cancel Event</button>
+            </div>
+          </div>
+        `);
+      }
+      else if (act === 'confirmcancelevent') {
+        const id = t.dataset.id;
+        t.disabled = true;
+        t.textContent = 'Cancelling…';
+        try {
+          await api('/events/' + id, 'DELETE');
+          closeModal();
+          toast('Event cancelled successfully');
+          location.hash = '/events';
+          render();
+        } catch (e) {
+          fail(e);
+          t.disabled = false;
+        }
+      }
+      else if (act === 'changesvcbudget') {
+        const serviceId = t.dataset.id;
+        const cat = t.dataset.category;
+        const currentBudget = t.dataset.budget || '';
+        openModal(`
+          <div class="modal-head">
+            <div>
+              <h2>Change Budget for ${cap(cat)}</h2>
+              <p class="small muted" style="margin-top:4px">Adjust the allocated budget limit for this vendor category</p>
+            </div>
+            <button class="xbtn" data-act="closemodal" aria-label="Close">×</button>
+          </div>
+          <form data-form="updatesvcbudget" data-id="${serviceId}" class="modal-body stack">
+            <p class="muted" style="font-size:14px;line-height:1.5">Increasing this budget allows higher-tier vendors whose quotes exceeded your previous limit to satisfy requirements and be booked.</p>
+            <div class="field">
+              <label for="f-svcbudget">Allocated Budget (₹ INR)</label>
+              <input id="f-svcbudget" type="number" min="0" step="500" name="budget" value="${esc(currentBudget)}" placeholder="e.g. 75000 (leave blank for no limit)" autofocus>
+            </div>
+            <div class="row end" style="gap:10px;margin-top:16px">
+              <button type="button" class="btn" data-act="closemodal">Cancel</button>
+              <button type="submit" class="btn primary">Save & Update Budget</button>
+            </div>
+          </form>
+        `);
+      }
+      else if (act === 'quickbudgetmatch') {
+        const serviceId = t.dataset.service;
+        const vendorId = t.dataset.vendor;
+        const quote = t.dataset.quote;
+        const vendorName = t.dataset.name;
+        try {
+          t.disabled = true;
+          t.textContent = 'Updating…';
+          await api('/services/' + serviceId, 'PUT', { budget: quote });
+          t.textContent = 'Requesting…';
+          await api(`/services/${serviceId}/bookings`, 'POST', { vendor_id: vendorId });
+          closeModal();
+          toast(`Budget adjusted to ${inr(Number(quote))} and booking requested with ${vendorName}!`);
+          render();
+        } catch (e) {
+          fail(e);
+          t.disabled = false;
+        }
+      }
     } catch (e) { fail(e); }
   });
 
@@ -1524,6 +1676,19 @@
         closeModal();
         toast(r.reconfirm ? `Event updated. ${r.reconfirm} booking${r.reconfirm > 1 ? 's' : ''} need vendor re-confirmation.` : 'Event updated');
         render();
+      }
+      else if (kind === 'updatesvcbudget') {
+        const serviceId = f.dataset.id;
+        try {
+          await api('/services/' + serviceId, 'PUT', { budget: d.budget });
+          closeModal();
+          toast('Budget limit updated successfully');
+          if (state.match && state.match.serviceId == serviceId) {
+            await openMatch(serviceId);
+          } else {
+            render();
+          }
+        } catch (e) { fail(e); }
       }
       else if (kind === 'block') {
         await api('/vendor/blocked', 'POST', d);

@@ -150,3 +150,56 @@ test('Validation and role protection', async () => {
   assert.equal(vendorOnly.status, 403);
   assert.equal((await call('GET', '/api/events')).status, 401);
 });
+
+test('Organizer can update individual service budget to satisfy requirements', async () => {
+  const org = await login('organizer@demo.com');
+  // Create an event with tight catering budget (e.g. 50,000)
+  const res = await call('POST', '/api/events', org, {
+    name: 'Budget Test Gala', date: '2026-12-25', start_time: '18:00', end_time: '22:00',
+    city: 'Bengaluru', attendees: 100, budget: 100000,
+    services: [{ category: 'catering', budget: 20000 }]
+  });
+  assert.equal(res.status, 200);
+  const eventId = res.data.id;
+  const ev = (await call('GET', `/api/events/${eventId}`, org)).data;
+  const catering = svc(ev, 'catering');
+
+  // Check matching: Royal Banquet (quote ~75k) should be excluded due to budget
+  const m1 = (await call('GET', `/api/services/${catering.id}/matches`, org)).data;
+  const royalEx = m1.excluded.find(x => x.name === 'Royal Banquet');
+  assert.ok(royalEx, 'Royal Banquet should be excluded initially due to low budget');
+  assert.match(royalEx.reasons.join(' '), /exceeds service budget/);
+
+  // Organizer increases individual service budget to 90,000
+  const upd = await call('PUT', `/api/services/${catering.id}`, org, { budget: 90000 });
+  assert.equal(upd.status, 200);
+  assert.equal(upd.data.budget, 90000);
+
+  // Now Royal Banquet satisfies the budget requirement and is in matches!
+  const m2 = (await call('GET', `/api/services/${catering.id}/matches`, org)).data;
+  const royalMatch = m2.matches.find(x => x.name === 'Royal Banquet');
+  assert.ok(royalMatch, 'Royal Banquet should now be a valid match after budget change');
+});
+
+test('Organizer can cancel an event and booked vendors receive cancellation notification', async () => {
+  const org = await login('organizer2@demo.com');
+  const bass = await login('bassline@demo.com');
+
+  // Find Corporate Annual Day which has bassline confirmed
+  const { data: { events } } = await call('GET', '/api/events', org);
+  const corp = events.find(e => e.name === 'Corporate Annual Day');
+  assert.ok(corp);
+
+  // Cancel the event
+  const del = await call('DELETE', `/api/events/${corp.id}`, org);
+  assert.equal(del.status, 200);
+
+  // BassLine vendor should have received a cancellation notice
+  const notifs = (await call('GET', '/api/notifications', bass)).data;
+  assert.ok(notifs.items.some(n => /Corporate Annual Day.*was cancelled/i.test(n.message)));
+
+  // Event should no longer exist
+  const check = await call('GET', `/api/events/${corp.id}`, org);
+  assert.equal(check.status, 404);
+});
+

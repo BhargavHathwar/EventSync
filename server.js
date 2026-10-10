@@ -185,6 +185,27 @@ app.put('/api/events/:id', requireAuth('organizer'), h(async (req, res) => {
   res.json(await L.updateEvent(Number(req.params.id), req.user.id, f));
 }));
 
+async function cancelEvent(req, res) {
+  const event = await ownedEvent(req);
+  const eventId = Number(req.params.id);
+  // Find all active bookings for this event to notify vendors
+  const rows = await db.prepare(`
+    SELECT b.id, v.user_id, v.name AS vendor_name, es.category
+    FROM bookings b
+    JOIN event_services es ON es.id = b.event_service_id
+    JOIN vendors v ON v.id = b.vendor_id
+    WHERE es.event_id = ? AND b.status IN ('requested','accepted')
+  `).all(eventId);
+  for (const r of rows) {
+    await L.notify(r.user_id, `⚠ Event '${event.name}' (${event.date}) was cancelled by the organizer.`);
+  }
+  await db.prepare('DELETE FROM events WHERE id = ?').run(eventId);
+  res.json({ ok: true, message: 'Event cancelled' });
+}
+
+app.delete('/api/events/:id', requireAuth('organizer'), h(cancelEvent));
+app.post('/api/events/:id/cancel', requireAuth('organizer'), h(cancelEvent));
+
 app.post('/api/events/:id/services', requireAuth('organizer'), h(async (req, res) => {
   const event = await ownedEvent(req);
   const { category, budget } = req.body;
@@ -204,6 +225,19 @@ async function ownedService(req) {
   if (!s) throw new HttpError(404, 'Service not found');
   return s;
 }
+
+app.put('/api/services/:id', requireAuth('organizer'), h(async (req, res) => {
+  const s = await ownedService(req);
+  let budget = req.body.budget;
+  if (budget === '' || budget === null || budget === undefined) {
+    budget = null;
+  } else {
+    budget = Number(budget);
+    if (isNaN(budget) || budget < 0) throw new HttpError(400, 'Invalid budget amount');
+  }
+  await db.prepare('UPDATE event_services SET budget = ? WHERE id = ?').run(budget, s.id);
+  res.json({ ok: true, id: s.id, budget });
+}));
 
 app.get('/api/services/:id/matches', requireAuth('organizer'), h(async (req, res) => {
   await ownedService(req);
