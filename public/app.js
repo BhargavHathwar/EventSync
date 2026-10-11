@@ -688,7 +688,7 @@
     const org = state.user.role === 'organizer';
     const msgCountBadge = state.chatUnread > 0 ? `<span class="nav-msg-count">${state.chatUnread}</span>` : '';
     const nav = org
-      ? [['/events', 'My events'], ['/events/new', 'New event'], ['/messages', `Messages${msgCountBadge}`]]
+      ? [['/events', 'My events'], ['/vendors', 'Explore Vendors'], ['/events/new', 'New event'], ['/messages', `Messages${msgCountBadge}`]]
       : [['/vendor/requests', 'Requests'], ['/vendor/commitments', 'Commitments'], ['/vendor/availability', 'Availability'], ['/vendor/profile', 'Profile'], ['/messages', `Messages${msgCountBadge}`]];
 
     $('#app').innerHTML = `
@@ -699,7 +699,7 @@
           <span>EventSync</span>
         </a>
         <nav class="nav" aria-label="Main">
-          ${nav.map(([h, l]) => `<a href="#${h}" class="${active === h || (h === '/events' && /^\/events\/\d+/.test(active)) || (h === '/messages' && /^\/messages/.test(active)) ? 'active' : ''}">${l}</a>`).join('')}
+          ${nav.map(([h, l]) => `<a href="#${h}" class="${active === h || (h === '/events' && /^\/events\/\d+/.test(active)) || (h === '/vendors' && /^\/vendors/.test(active)) || (h === '/messages' && /^\/messages/.test(active)) ? 'active' : ''}">${l}</a>`).join('')}
         </nav>
         <div class="userbox">
           ${themeToggleMarkup()}
@@ -752,7 +752,10 @@
 
   // ---------- organizer views ----------
   async function eventsView(v) {
-    const { events } = await api('/events');
+    const [{ events }, { vendors }] = await Promise.all([
+      api('/events'),
+      api('/vendors').catch(() => ({ vendors: [] }))
+    ]);
 
     // Calculate aggregated summary for top 3D stats banner
     let totalConfirmedServices = 0;
@@ -766,13 +769,19 @@
       }
     });
 
+    const newVendors = (vendors || []).filter(item => item.is_new);
+    const suggestedVendors = newVendors.length ? newVendors : (vendors || []).slice(0, 4);
+
     v.innerHTML = `
       <div class="page-head">
         <div>
           <h1>My events</h1>
           <p class="muted">Track every vendor commitment and live booking status for each event in real time.</p>
         </div>
-        <a class="btn primary" href="#/events/new" style="text-decoration:none">+ Create new event</a>
+        <div class="row" style="gap:10px">
+          <a class="btn outline" href="#/vendors" style="text-decoration:none">🔍 Explore Vendors</a>
+          <a class="btn primary" href="#/events/new" style="text-decoration:none">+ Create new event</a>
+        </div>
       </div>
 
       <div class="hero-stats-banner">
@@ -805,6 +814,42 @@
           </div>
         </div>
       </div>
+
+      ${suggestedVendors.length ? `
+        <section class="suggested-section" style="margin-bottom:28px">
+          <div class="row between" style="align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+            <div>
+              <h2 style="font-size:19px;margin:0;display:flex;align-items:center;gap:8px">
+                <span>🌟</span> Suggested & Newly Joined Vendors
+              </h2>
+              <p class="tiny muted" style="margin:3px 0 0">Verified providers available for booking across your active and upcoming events.</p>
+            </div>
+            <a href="#/vendors" class="small" style="color:var(--accent-sky);font-weight:600;text-decoration:none">Explore all ${(vendors || []).length} vendors →</a>
+          </div>
+          <div class="suggested-vendors-grid">
+            ${suggestedVendors.slice(0, 4).map(item => `
+              <div class="card suggested-vendor-card ${item.is_new ? 'vendor-new-glow' : ''}">
+                <div class="row between" style="align-items:flex-start">
+                  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                    ${item.is_new ? '<span class="badge new-vendor-badge">✨ NEW VENDOR</span>' : ''}
+                    <span class="badge ${item.category}">${ICON[item.category]} ${cap(item.category)}</span>
+                  </div>
+                  <span class="stars">★ ${item.rating.toFixed(1)}</span>
+                </div>
+                <h4 style="margin:10px 0 2px;font-size:15.5px">${esc(item.name)}</h4>
+                <p class="tiny muted" style="margin:0">by <b>${esc(item.owner_name || item.name)}</b> · 📍 ${esc(item.service_areas)}</p>
+                <p class="small muted" style="margin:8px 0;line-height:1.4;flex:1">${esc(item.package || item.description)}</p>
+                <div class="row between" style="align-items:center;margin-top:auto;padding-top:10px;border-top:1px solid var(--line)">
+                  <div class="price" style="font-size:15px">${inr(item.price)} <span class="tiny muted" style="font-weight:normal">${UNIT[item.price_unit]}</span></div>
+                  <div class="row" style="gap:6px">
+                    <a href="#/messages/${item.user_id}" class="btn tiny outline glow-btn" style="text-decoration:none">💬 Chat</a>
+                    <button class="btn tiny primary glow-btn" data-act="openbookmodal" data-vendor-id="${item.id}" data-vendor-name="${esc(item.name)}" data-vendor-cat="${item.category}" data-vendor-price="${item.price}">🎯 Book</button>
+                  </div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </section>` : ''}
 
       ${events.length ? `
         <div class="grid cols-2">
@@ -973,6 +1018,26 @@
           <input type="number" min="0" name="budget" placeholder="Budget (₹)" style="width:160px" aria-label="Service budget">
           <button class="btn primary" type="submit">Add Service</button>
         </form>` : ''}
+
+      ${missing.includes('photography') ? `
+        <div class="card" style="margin-top:16px;border-left:3px solid #38bdf8;background:rgba(37,99,235,0.08);padding:16px 20px">
+          <div class="row between" style="align-items:center;gap:12px;flex-wrap:wrap">
+            <div style="display:flex;align-items:center;gap:12px">
+              <span style="font-size:26px">📷</span>
+              <div>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span class="badge new-vendor-badge">✨ SUGGESTED VENDOR</span>
+                  <b style="font-size:15.5px">Arnav Clicks (Photography)</b>
+                </div>
+                <p class="tiny muted" style="margin:3px 0 0">Verified photographer in Bengaluru · ₹45,000 flat · Up to 500 guests</p>
+              </div>
+            </div>
+            <div class="row" style="gap:8px">
+              <a href="#/messages/36" class="btn tiny outline glow-btn" style="text-decoration:none">💬 Chat with Arnav</a>
+              <button class="btn tiny primary glow-btn" data-act="openbookmodal" data-vendor-id="34" data-vendor-name="Arnav Clicks" data-vendor-cat="photography" data-vendor-price="45000">⚡ Add & Request Arnav</button>
+            </div>
+          </div>
+        </div>` : ''}
     `;
     apply3DTilt();
   }
@@ -1032,6 +1097,171 @@
     </article>`;
   }
 
+  // ---------- vendors directory view ----------
+  async function vendorsDirectoryView(v) {
+    state.vendorCat = state.vendorCat || 'all';
+    state.vendorQ = state.vendorQ || '';
+
+    const [{ vendors }, { events }] = await Promise.all([
+      api('/vendors'),
+      api('/events').catch(() => ({ events: [] }))
+    ]);
+
+    function renderList() {
+      const cat = state.vendorCat;
+      const q = (state.vendorQ || '').trim().toLowerCase();
+
+      const filtered = (vendors || []).filter(item => {
+        if (cat !== 'all' && item.category !== cat) return false;
+        if (q) {
+          const matchName = (item.name || '').toLowerCase().includes(q);
+          const matchOwner = (item.owner_name || '').toLowerCase().includes(q);
+          const matchPkg = (item.package || '').toLowerCase().includes(q);
+          const matchDesc = (item.description || '').toLowerCase().includes(q);
+          const matchAreas = (item.service_areas || '').toLowerCase().includes(q);
+          if (!matchName && !matchOwner && !matchPkg && !matchDesc && !matchAreas) return false;
+        }
+        return true;
+      });
+
+      const listEl = $('#vendor-directory-list');
+      if (!listEl) return;
+
+      if (!filtered.length) {
+        listEl.innerHTML = `
+          <div class="empty" style="grid-column:1/-1">
+            <div style="font-size:36px;margin-bottom:8px">🔍</div>
+            <h3>No vendors found matching "${esc(state.vendorQ || state.vendorCat)}"</h3>
+            <p class="muted">Try adjusting your search query or selecting a different service category.</p>
+          </div>`;
+        return;
+      }
+
+      listEl.innerHTML = filtered.map(item => `
+        <article class="card vendor-dir-card ${item.is_new ? 'vendor-new-glow' : ''}">
+          <div class="row between" style="align-items:flex-start;gap:8px">
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+              ${item.is_new ? '<span class="badge new-vendor-badge">✨ NEW VENDOR</span>' : ''}
+              <span class="badge ${item.category}">${ICON[item.category]} ${cap(item.category)}</span>
+            </div>
+            <span class="stars">★ ${item.rating.toFixed(1)}</span>
+          </div>
+
+          <h3 style="margin:12px 0 2px;font-size:18px">${esc(item.name)}</h3>
+          <p class="tiny muted" style="margin:0 0 10px">by <b>${esc(item.owner_name || item.name)}</b> · 📍 Serves ${esc(item.service_areas)}</p>
+
+          <p class="small muted" style="margin-bottom:12px;line-height:1.45">${esc(item.package || item.description)}</p>
+
+          <div class="kv" style="margin:8px 0 14px">
+            <span><b>💰 Price:</b> <b>${inr(item.price)}</b> ${UNIT[item.price_unit]}</span>
+            ${item.max_guests ? `<span><b>👥 Max Guests:</b> ${item.max_guests}</span>` : '<span><b>👥 Capacity:</b> Flexible</span>'}
+            <span><b>⚡ Parallel:</b> ${item.max_concurrent} event(s)</span>
+          </div>
+
+          <div class="row between" style="margin-top:auto;padding-top:14px;border-top:1px solid var(--line);align-items:center;gap:8px">
+            <div class="price" style="font-size:16px">${inr(item.price)}</div>
+            <div class="row" style="gap:8px">
+              <a href="#/messages/${item.user_id}" class="btn outline small glow-btn" style="text-decoration:none">💬 Chat</a>
+              <button class="btn primary small glow-btn" data-act="openbookmodal" data-vendor-id="${item.id}" data-vendor-name="${esc(item.name)}" data-vendor-cat="${item.category}" data-vendor-price="${item.price}">🎯 Book for Event</button>
+            </div>
+          </div>
+        </article>
+      `).join('');
+
+      apply3DTilt();
+    }
+
+    v.innerHTML = `
+      <div class="page-head">
+        <div>
+          <h1>Explore Vendors</h1>
+          <p class="muted">Browse vetted event professionals across photography, catering, decoration, and sound. Book directly or send a message.</p>
+        </div>
+        <a class="btn primary" href="#/events/new" style="text-decoration:none">+ Create new event</a>
+      </div>
+
+      <div class="vendor-filter-bar">
+        <div class="search-wrap" style="flex:1;max-width:380px;position:relative">
+          <input type="text" id="vendor-search-input" placeholder="🔍 Search vendor, owner (e.g. Arnav), city..." value="${esc(state.vendorQ)}" class="search-input" style="width:100%;padding:10px 14px;border-radius:12px;border:1px solid var(--input-border);background:var(--input-bg);color:var(--text-primary);font-size:14px">
+        </div>
+        <div class="category-pills" role="group" aria-label="Filter by category" style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="pill-btn ${state.vendorCat === 'all' ? 'active' : ''}" data-act="filter-vendor-cat" data-cat="all">All Vendors (${(vendors || []).length})</button>
+          ${CATS.map(c => {
+            const count = (vendors || []).filter(x => x.category === c).length;
+            return `
+              <button class="pill-btn ${state.vendorCat === c ? 'active' : ''}" data-act="filter-vendor-cat" data-cat="${c}">
+                ${ICON[c]} ${cap(c)} (${count})
+              </button>`;
+          }).join('')}
+        </div>
+      </div>
+
+      <div id="vendor-directory-list" class="grid cols-2" style="margin-top:20px"></div>
+    `;
+
+    renderList();
+
+    const searchInput = $('#vendor-search-input');
+    if (searchInput) {
+      searchInput.addEventListener('input', e => {
+        state.vendorQ = e.target.value;
+        renderList();
+      });
+    }
+  }
+
+  async function openBookVendorModal(vendorId, vendorName, vendorCat, vendorPrice) {
+    try {
+      const { events } = await api('/events');
+      if (!events || !events.length) {
+        openModal(`
+          <div class="modal-head">
+            <h2>Book ${esc(vendorName)}</h2>
+            <button class="xbtn" data-act="closemodal">×</button>
+          </div>
+          <div class="modal-body" style="text-align:center;padding:24px 10px">
+            <p style="font-size:15px;margin-bottom:16px">You don't have any active events yet to book <b>${esc(vendorName)}</b>.</p>
+            <p class="small muted" style="margin-bottom:20px">Create an event first so we can coordinate your date, guest count, and service requirements.</p>
+            <a href="#/events/new" class="btn primary glow-btn" onclick="closeModal()">+ Create New Event</a>
+          </div>
+        `);
+        return;
+      }
+
+      openModal(`
+        <div class="modal-head">
+          <div>
+            <h2>Book ${esc(vendorName)}</h2>
+            <p class="tiny muted" style="margin:2px 0 0">${ICON[vendorCat]} ${cap(vendorCat)} · Starting at ${inr(vendorPrice)}</p>
+          </div>
+          <button class="xbtn" data-act="closemodal">×</button>
+        </div>
+        <form data-form="confirmbookvendor" class="modal-body stack" style="gap:16px">
+          <input type="hidden" name="vendor_id" value="${vendorId}">
+          <input type="hidden" name="vendor_name" value="${esc(vendorName)}">
+          <div class="field">
+            <label for="b-event-id">Select one of your events</label>
+            <select id="b-event-id" name="event_id" required style="padding:10px 12px;font-size:14px;border-radius:10px">
+              ${events.map(e => `
+                <option value="${e.id}">${esc(e.name)} — ${fmtDate(e.date)} (${esc(e.city)}, ${e.attendees} guests)</option>
+              `).join('')}
+            </select>
+          </div>
+          <div class="field">
+            <label for="b-msg">Optional message for vendor</label>
+            <textarea id="b-msg" name="message" rows="2" placeholder="Hi ${esc(vendorName)}, we would love to have you coordinate for our event!"></textarea>
+          </div>
+          <div class="row" style="margin-top:8px;justify-content:flex-end;gap:10px">
+            <button type="button" class="btn" data-act="closemodal">Cancel</button>
+            <button type="submit" class="btn primary glow-btn">Send Booking Request</button>
+          </div>
+        </form>
+      `);
+    } catch (e) {
+      fail(e);
+    }
+  }
+
   // matching modal
   async function openMatch(serviceId) {
     try {
@@ -1084,7 +1314,7 @@
           <div class="card match">
             <div style="flex:1">
               <div class="row" style="align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap">
-                <h3 style="margin:0">${esc(m.name)} <span class="stars">★ ${m.rating.toFixed(1)}</span></h3>
+                <h3 style="margin:0">${esc(m.name)} <span class="stars">★ ${m.rating.toFixed(1)}</span> ${m.is_new ? '<span class="badge new-vendor-badge" style="margin-left:6px">✨ NEW VENDOR</span>' : ''}</h3>
                 <div class="match-score-badge ${m.match_probability >= 90 ? 'score-high' : m.match_probability >= 75 ? 'score-mid' : 'score-low'}">
                   <span class="score-percent">${m.match_probability ?? 95}%</span>
                   <span class="score-label">Match</span>
@@ -1690,6 +1920,7 @@
     try {
       let m;
       if (r === '/events') await eventsView(v);
+      else if (r === '/vendors') await vendorsDirectoryView(v);
       else if (r === '/events/new') newEventView(v);
       else if ((m = r.match(/^\/events\/(\d+)$/))) await eventDetailView(v, m[1]);
       else if (r === '/vendor/requests') await vendorRequests(v);
@@ -1768,6 +1999,13 @@
         render();
       }
       else if (act === 'closemodal') closeModal();
+      else if (act === 'filter-vendor-cat') {
+        state.vendorCat = t.dataset.cat;
+        vendorsDirectoryView($('#view'));
+      }
+      else if (act === 'openbookmodal') {
+        openBookVendorModal(t.dataset.vendorId, t.dataset.vendorName, t.dataset.vendorCat, t.dataset.vendorPrice);
+      }
       else if (act === 'match') openMatch(t.dataset.id);
       else if (act === 'sort') {
         state.match.sort = t.dataset.sort;
@@ -1963,6 +2201,18 @@
         await api(`/events/${f.dataset.event}/services`, 'POST', d);
         toast('Service added successfully');
         render();
+      }
+      else if (kind === 'confirmbookvendor') {
+        const eventId = d.event_id;
+        const vendorId = d.vendor_id;
+        const vendorName = d.vendor_name;
+        await api(`/events/${eventId}/book-vendor`, 'POST', {
+          vendor_id: vendorId,
+          message: d.message
+        });
+        closeModal();
+        toast(`Booking request sent to ${vendorName}!`);
+        location.hash = `/events/${eventId}`;
       }
       else if (kind === 'editevent') {
         const r = await api('/events/' + f.dataset.id, 'PUT', d);

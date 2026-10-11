@@ -193,6 +193,7 @@ async function matchVendors(serviceId) {
       competing_requests: competing,
       match_probability,
       probability_factors: factors,
+      is_new: v.id > 33,
     };
 
     if (failures.length) excluded.push({ ...card, reasons: failures.map(f => f.message) });

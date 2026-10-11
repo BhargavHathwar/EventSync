@@ -111,6 +111,19 @@ app.post('/api/auth/register', h(async (req, res) => {
     return newUid;
   })();
   const token = await createSession(uid);
+
+  // Automatically suggest newly created vendor to all organizers
+  if (role === 'vendor' && profile) {
+    try {
+      const orgs = await db.prepare("SELECT id FROM users WHERE role = 'organizer'").all();
+      for (const org of orgs) {
+        await L.notify(org.id, `🎉 New ${profile.category} vendor joined: ${profile.name} (${profile.service_areas}). Check them out for your events!`);
+      }
+    } catch (e) {
+      console.error('Failed to notify organizers of new vendor:', e);
+    }
+  }
+
   res.json({ token, user: { id: uid, name: cleanName, email: cleanEmail, role } });
 }));
 
@@ -257,6 +270,54 @@ app.post('/api/services/:id/bookings', requireAuth('organizer'), h(async (req, r
   if (!vendorId) throw new HttpError(400, 'Choose a vendor');
   const id = await L.createBooking(Number(req.params.id), vendorId, req.user.id, req.body.message);
   res.json({ id });
+}));
+
+// ---------------- explore & direct vendor booking ----------------
+app.get('/api/vendors', requireAuth(), h(async (req, res) => {
+  const { category, q } = req.query;
+  let sql = `
+    SELECT v.*, u.name AS owner_name, u.email AS owner_email, u.created_at AS user_created_at
+    FROM vendors v
+    JOIN users u ON u.id = v.user_id
+    WHERE 1=1
+  `;
+  const params = [];
+  if (category && CATEGORIES.includes(category)) {
+    sql += ' AND v.category = ?';
+    params.push(category);
+  }
+  if (q) {
+    sql += ' AND (v.name LIKE ? OR u.name LIKE ? OR v.package LIKE ? OR v.description LIKE ? OR v.service_areas LIKE ?)';
+    const term = `%${q}%`;
+    params.push(term, term, term, term, term);
+  }
+  sql += ' ORDER BY v.id DESC';
+  const vendors = await db.prepare(sql).all(...params);
+  const withFlags = vendors.map(v => ({
+    ...v,
+    is_new: v.id > 33
+  }));
+  res.json({ vendors: withFlags });
+}));
+
+app.post('/api/events/:id/book-vendor', requireAuth('organizer'), h(async (req, res) => {
+  const event = await ownedEvent(req);
+  const vendorId = parseInt(req.body.vendor_id, 10);
+  if (!vendorId) throw new HttpError(400, 'Choose a vendor');
+  const vendor = await db.prepare('SELECT * FROM vendors WHERE id = ?').get(vendorId);
+  if (!vendor) throw new HttpError(404, 'Vendor not found');
+
+  // Find or create service in this event for the vendor's category
+  let service = await db.prepare('SELECT * FROM event_services WHERE event_id = ? AND category = ?').get(event.id, vendor.category);
+  if (!service) {
+    const quote = L.quoteFor(vendor, event);
+    const sRes = await db.prepare('INSERT INTO event_services (event_id, category, budget, notes) VALUES (?,?,?,?)')
+      .run(event.id, vendor.category, Math.max(Number(event.budget || 0), quote), '');
+    service = { id: sRes.lastInsertRowid, event_id: event.id, category: vendor.category, budget: quote };
+  }
+
+  const id = await L.createBooking(service.id, vendorId, req.user.id, req.body.message || `Booking request for ${event.name}`);
+  res.json({ id, service_id: service.id });
 }));
 
 // ---------------- booking actions ----------------
